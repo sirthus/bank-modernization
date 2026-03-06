@@ -13,3 +13,4 @@ services:
 
 volumes:
   pg18_data:
+    name: pg18_data
