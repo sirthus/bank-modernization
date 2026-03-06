@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:18
+    container_name: pg18
+    environment:
+      POSTGRES_DB: modernize
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg18_data:/var/lib/postgresql
+
+volumes:
+  pg18_data:
