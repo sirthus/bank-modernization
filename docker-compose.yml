@@ -13,4 +13,5 @@ services:
 
 volumes:
   pg18_data:
+    external: true
     name: pg18_data
