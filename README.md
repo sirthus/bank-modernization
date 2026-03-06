@@ -1,2 +1,11 @@
-# bank-modernization
-Bank Modernization - Learning project to use a PostgreSQL backend with a Spring frontend to simulate batch processing, etc. 
+# Bank Modernization
+
+Learning project for:
+- PostgreSQL
+- containerization with Docker
+- GitHub workflow
+- modern batch processing
+- later: Java / Spring Boot / Spring Batch
+
+Current phase:
+- repository setup
