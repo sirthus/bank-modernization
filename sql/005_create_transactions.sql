@@ -1,13 +1,16 @@
+-- 005_create_transactions.sql
+-- Production transactions table.
+
 CREATE TABLE bank.transactions (
-    txn_id bigint NOT NULL,
-    account_id bigint NOT NULL,
-    merchant_id bigint,
-    direction character(1) NOT NULL,
-    amount_cents bigint NOT NULL,
-    status text DEFAULT 'posted'::text NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    description text,
-    CONSTRAINT transactions_amount_cents_check CHECK ((amount_cents > 0)),
-    CONSTRAINT transactions_direction_check CHECK ((direction = ANY (ARRAY['D'::bpchar, 'C'::bpchar]))),
-    CONSTRAINT transactions_status_check CHECK ((status = ANY (ARRAY['posted'::text, 'pending'::text, 'reversed'::text])))
+    txn_id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    account_id      INTEGER         NOT NULL,
+    merchant_id     INTEGER,
+    direction       CHAR(1)         NOT NULL,
+    amount_cents    INTEGER         NOT NULL,
+    status          TEXT            NOT NULL DEFAULT 'posted',
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    description     TEXT,
+    CONSTRAINT transactions_amount_cents_check CHECK (amount_cents > 0),
+    CONSTRAINT transactions_direction_check CHECK (direction IN ('D', 'C')),
+    CONSTRAINT transactions_status_check CHECK (status IN ('posted', 'pending', 'reversed'))
 );

@@ -1,3 +1,6 @@
+-- 009_seed_small_data.sql
+-- Small controlled seed set for rebuild validation.
+
 INSERT INTO bank.customers (customer_id, full_name, email, phone, created_at)
 VALUES
     (1001, 'Alice Carter', 'alice.carter@example.com', '555-0101', now()),
@@ -14,9 +17,9 @@ VALUES
     (3001, 'H-E-B', 'groceries', now()),
     (3002, 'Shell', 'fuel', now());
 
-INSERT INTO bank.transactions (txn_id, account_id, merchant_id, direction, amount_cents, status, created_at, description)
+INSERT INTO bank.transactions (account_id, merchant_id, direction, amount_cents, status, created_at, description)
 VALUES
-    (4001, 2001, 3001, 'D', 5423,  'posted',   now(), 'Groceries'),
-    (4002, 2001, 3002, 'D', 3200,  'posted',   now(), 'Fuel'),
-    (4003, 2002, 3001, 'D', 1899,  'posted',   now(), 'Snacks'),
-    (4004, 2003, NULL, 'C', 25000, 'pending',  now(), 'Deposit');
+    (2001, 3001, 'D', 5423,  'posted',  now(), 'Groceries'),
+    (2001, 3002, 'D', 3200,  'posted',  now(), 'Fuel'),
+    (2002, 3001, 'D', 1899,  'posted',  now(), 'Snacks'),
+    (2003, NULL, 'C', 25000, 'pending', now(), 'Deposit');

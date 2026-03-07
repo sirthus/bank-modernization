@@ -39,3 +39,12 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/013_create_stag
 
 docker cp .\sql\014_load_sample_batch.sql pg18:/tmp/014_load_sample_batch.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/014_load_sample_batch.sql
+
+docker cp .\sql\016_load_bad_sample_batch.sql pg18:/tmp/016_load_bad_sample_batch.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/016_load_bad_sample_batch.sql
+
+docker cp .\sql\015_validate_staged_transactions.sql pg18:/tmp/015_validate_staged_transactions.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/015_validate_staged_transactions.sql
+
+docker cp .\sql\017_post_validated_transactions.sql pg18:/tmp/017_post_validated_transactions.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/017_post_validated_transactions.sql
