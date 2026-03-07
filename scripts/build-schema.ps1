@@ -21,3 +21,6 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/007_foreign_key
 
 docker cp .\sql\008_foreign_key_indexes.sql pg18:/tmp/008_foreign_key_indexes.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/008_foreign_key_indexes.sql
+
+docker cp .\sql\009_seed_small_data.sql pg18:/tmp/009_seed_small_data.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/009_seed_small_data.sql
