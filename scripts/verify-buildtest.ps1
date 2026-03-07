@@ -7,7 +7,13 @@ select 'accounts', count(*) from bank.accounts
 union all
 select 'merchants', count(*) from bank.merchants
 union all
-select 'transactions', count(*) from bank.transactions;
+select 'transactions', count(*) from bank.transactions
+union all
+select 'batch_jobs', count(*) from bank.batch_jobs
+union all
+select 'transaction_batches', count(*) from bank.transaction_batches
+union all
+select 'batch_job_errors', count(*) from bank.batch_job_errors;
 "
 
 docker exec pg18 psql -U postgres -d modernize_buildtest -c "

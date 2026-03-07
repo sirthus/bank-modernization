@@ -24,3 +24,12 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/008_foreign_key
 
 docker cp .\sql\009_seed_small_data.sql pg18:/tmp/009_seed_small_data.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/009_seed_small_data.sql
+
+docker cp .\sql\010_create_batch_jobs.sql pg18:/tmp/010_create_batch_jobs.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/010_create_batch_jobs.sql
+
+docker cp .\sql\011_create_transaction_batches.sql pg18:/tmp/011_create_transaction_batches.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/011_create_transaction_batches.sql
+
+docker cp .\sql\012_create_batch_job_errors.sql pg18:/tmp/012_create_batch_job_errors.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/012_create_batch_job_errors.sql
