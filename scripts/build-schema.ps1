@@ -33,3 +33,9 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/011_create_tran
 
 docker cp .\sql\012_create_batch_job_errors.sql pg18:/tmp/012_create_batch_job_errors.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/012_create_batch_job_errors.sql
+
+docker cp .\sql\013_create_staged_transactions.sql pg18:/tmp/013_create_staged_transactions.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/013_create_staged_transactions.sql
+
+docker cp .\sql\014_load_sample_batch.sql pg18:/tmp/014_load_sample_batch.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/014_load_sample_batch.sql
