@@ -15,7 +15,9 @@ select 'transaction_batches', count(*) from bank.transaction_batches
 union all
 select 'batch_job_errors', count(*) from bank.batch_job_errors
 union all
-select 'staged_transactions', count(*) from bank.staged_transactions;
+select 'staged_transactions', count(*) from bank.staged_transactions
+union all
+select 'batch_reconciliations', count(*) from bank.batch_reconciliations;
 "
 
 docker exec pg18 psql -U postgres -d modernize_buildtest -c "
@@ -55,5 +57,13 @@ select id, batch_id, account_id, merchant_id, direction, amount_cents, status
 docker exec pg18 psql -U postgres -d modernize_buildtest -c "
 select id, batch_job_id, error_message, record_ref
   from bank.batch_job_errors
+ order by id;
+"
+
+docker exec pg18 psql -U postgres -d modernize_buildtest -c "
+select id, batch_id, staged_count, posted_count,
+       staged_total_cents, posted_total_cents,
+       counts_match, totals_match
+  from bank.batch_reconciliations
  order by id;
 "

@@ -48,3 +48,9 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/015_validate_st
 
 docker cp .\sql\017_post_validated_transactions.sql pg18:/tmp/017_post_validated_transactions.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/017_post_validated_transactions.sql
+
+docker cp .\sql\018_create_batch_reconciliations.sql pg18:/tmp/018_create_batch_reconciliations.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/018_create_batch_reconciliations.sql
+
+docker cp .\sql\019_reconcile_batches.sql pg18:/tmp/019_reconcile_batches.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/019_reconcile_batches.sql
