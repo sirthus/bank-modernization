@@ -1,5 +1,6 @@
 package com.modernize.bankbatch.processor;
 
+import com.modernize.bankbatch.exception.ValidationException;
 import com.modernize.bankbatch.model.StagedTransaction;
 import org.springframework.batch.item.ItemProcessor;
 import org.springframework.stereotype.Component;
@@ -34,10 +35,10 @@ public class ValidationProcessor implements ItemProcessor<StagedTransaction, Sta
         if (errors.length() > 0) {
             item.setStatus("rejected");
             item.setErrorMessage(errors.toString());
-        } else {
-            item.setStatus("validated");
+            throw new ValidationException(item.getId(), errors.toString());
         }
 
+        item.setStatus("validated");
         return item;
     }
 }

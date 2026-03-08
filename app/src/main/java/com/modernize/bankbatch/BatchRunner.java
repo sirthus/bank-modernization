@@ -1,12 +1,13 @@
 package com.modernize.bankbatch;
 
 import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
+
+import java.util.Date;
 
 @Component
 public class BatchRunner implements CommandLineRunner {
@@ -31,26 +32,38 @@ public class BatchRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
+        Date runTimestamp = new Date();
 
         // Load the good file
         jobLauncher.run(loadTransactionsJob,
-            new JobParametersBuilder()
-                .addString("fileName", "ach_20250307.csv")
-                .toJobParameters());
+                new JobParametersBuilder()
+                        .addString("fileName", "ach_20250307.csv")
+                        .addDate("run.id", runTimestamp)
+                        .toJobParameters());
 
         // Load the bad file
         jobLauncher.run(loadTransactionsJob,
-            new JobParametersBuilder()
-                .addString("fileName", "ach_20250308_bad.csv")
-                .toJobParameters());
+                new JobParametersBuilder()
+                        .addString("fileName", "ach_20250308_bad.csv")
+                        .addDate("run.id", runTimestamp)
+                        .toJobParameters());
 
         // Validate all staged records
-        jobLauncher.run(validateTransactionsJob, new JobParameters());
+        jobLauncher.run(validateTransactionsJob,
+                new JobParametersBuilder()
+                        .addDate("run.id", runTimestamp)
+                        .toJobParameters());
 
         // Post validated records
-        jobLauncher.run(postTransactionsJob, new JobParameters());
+        jobLauncher.run(postTransactionsJob,
+                new JobParametersBuilder()
+                        .addDate("run.id", runTimestamp)
+                        .toJobParameters());
 
         // Reconcile
-        jobLauncher.run(reconcileJob, new JobParameters());
+        jobLauncher.run(reconcileJob,
+                new JobParametersBuilder()
+                        .addDate("run.id", runTimestamp)
+                        .toJobParameters());
     }
 }

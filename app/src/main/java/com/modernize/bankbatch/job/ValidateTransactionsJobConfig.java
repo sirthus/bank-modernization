@@ -1,6 +1,8 @@
 package com.modernize.bankbatch.job;
 
+import com.modernize.bankbatch.exception.ValidationException;
 import com.modernize.bankbatch.listener.ValidateJobCompletionListener;
+import com.modernize.bankbatch.listener.ValidationSkipListener;
 import com.modernize.bankbatch.model.StagedTransaction;
 import com.modernize.bankbatch.processor.ValidationProcessor;
 import com.modernize.bankbatch.writer.ValidationWriter;
@@ -27,7 +29,8 @@ public class ValidateTransactionsJobConfig {
     private final AtomicInteger validateJobId = new AtomicInteger();
 
     @Bean
-    public Tasklet validateSetupTasklet(JdbcTemplate jdbcTemplate) {
+    public Tasklet validateSetupTasklet(JdbcTemplate jdbcTemplate,
+                                        ValidationSkipListener skipListener) {
         return (contribution, chunkContext) -> {
 
             Integer jobId = jdbcTemplate.queryForObject(
@@ -36,6 +39,7 @@ public class ValidateTransactionsJobConfig {
                 Integer.class);
 
             validateJobId.set(jobId);
+            skipListener.setValidateJobId(validateJobId);
 
             return RepeatStatus.FINISHED;
         };
@@ -79,7 +83,7 @@ public class ValidateTransactionsJobConfig {
 
     @Bean
     public ValidationWriter validationWriter(JdbcTemplate jdbcTemplate) {
-        return new ValidationWriter(jdbcTemplate, validateJobId);
+        return new ValidationWriter(jdbcTemplate);
     }
 
     @Bean
@@ -87,12 +91,17 @@ public class ValidateTransactionsJobConfig {
                              PlatformTransactionManager transactionManager,
                              JdbcCursorItemReader<StagedTransaction> stagedTransactionReader,
                              ValidationProcessor validationProcessor,
-                             ValidationWriter validationWriter) {
+                             ValidationWriter validationWriter,
+                             ValidationSkipListener skipListener) {
         return new StepBuilder("validateStep", jobRepository)
                 .<StagedTransaction, StagedTransaction>chunk(10, transactionManager)
                 .reader(stagedTransactionReader)
                 .processor(validationProcessor)
                 .writer(validationWriter)
+                .faultTolerant()
+                .skip(ValidationException.class)
+                .skipLimit(10)
+                .listener(skipListener)
                 .build();
     }
 
