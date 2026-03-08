@@ -1,8 +1,6 @@
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/modernize_buildtest
-    username: postgres
-    password: postgres
+  profiles:
+    active: test
 
   batch:
     jdbc:
