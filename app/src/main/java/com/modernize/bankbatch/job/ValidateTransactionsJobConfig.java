@@ -1,6 +1,7 @@
 package com.modernize.bankbatch.job;
 
 import com.modernize.bankbatch.exception.ValidationException;
+import com.modernize.bankbatch.listener.ProgressListener;
 import com.modernize.bankbatch.listener.ValidateJobCompletionListener;
 import com.modernize.bankbatch.listener.ValidationSkipListener;
 import com.modernize.bankbatch.model.StagedTransaction;
@@ -92,16 +93,18 @@ public class ValidateTransactionsJobConfig {
                              JdbcCursorItemReader<StagedTransaction> stagedTransactionReader,
                              ValidationProcessor validationProcessor,
                              ValidationWriter validationWriter,
-                             ValidationSkipListener skipListener) {
+                             ValidationSkipListener skipListener,
+                             ProgressListener progressListener) {
         return new StepBuilder("validateStep", jobRepository)
-                .<StagedTransaction, StagedTransaction>chunk(10, transactionManager)
+                .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(stagedTransactionReader)
                 .processor(validationProcessor)
                 .writer(validationWriter)
                 .faultTolerant()
                 .skip(ValidationException.class)
-                .skipLimit(10)
+                .skipLimit(10000)
                 .listener(skipListener)
+                .listener(progressListener)
                 .build();
     }
 

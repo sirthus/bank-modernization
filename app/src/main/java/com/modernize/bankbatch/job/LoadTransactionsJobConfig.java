@@ -1,6 +1,7 @@
 package com.modernize.bankbatch.job;
 
 import com.modernize.bankbatch.listener.LoadJobCompletionListener;
+import com.modernize.bankbatch.listener.ProgressListener;
 import com.modernize.bankbatch.model.StagedTransaction;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
@@ -98,15 +99,17 @@ public class LoadTransactionsJobConfig {
     public Step loadStep(JobRepository jobRepository,
                          PlatformTransactionManager transactionManager,
                          FlatFileItemReader<StagedTransaction> csvReader,
-                         JdbcBatchItemWriter<StagedTransaction> stagingWriter) {
+                         JdbcBatchItemWriter<StagedTransaction> stagingWriter,
+                         ProgressListener progressListener) {
         return new StepBuilder("loadStep", jobRepository)
-                .<StagedTransaction, StagedTransaction>chunk(10, transactionManager)
+                .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(csvReader)
                 .processor(item -> {
                     item.setBatchId(batchId.get());
                     return item;
                 })
                 .writer(stagingWriter)
+                .listener(progressListener)
                 .build();
     }
 

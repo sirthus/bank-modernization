@@ -1,6 +1,7 @@
 package com.modernize.bankbatch.job;
 
 import com.modernize.bankbatch.listener.PostJobCompletionListener;
+import com.modernize.bankbatch.listener.ProgressListener;
 import com.modernize.bankbatch.model.StagedTransaction;
 import com.modernize.bankbatch.writer.PostingWriter;
 import org.springframework.batch.core.Job;
@@ -75,11 +76,13 @@ public class PostTransactionsJobConfig {
     public Step postStep(JobRepository jobRepository,
                          PlatformTransactionManager transactionManager,
                          JdbcCursorItemReader<StagedTransaction> validatedTransactionReader,
-                         PostingWriter postingWriter) {
+                         PostingWriter postingWriter,
+                         ProgressListener progressListener) {
         return new StepBuilder("postStep", jobRepository)
-                .<StagedTransaction, StagedTransaction>chunk(10, transactionManager)
+                .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(validatedTransactionReader)
                 .writer(postingWriter)
+                .listener(progressListener)
                 .build();
     }
 
