@@ -2,6 +2,7 @@ package com.modernize.bankbatch;
 
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParameters;
+import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.CommandLineRunner;
@@ -30,9 +31,26 @@ public class BatchRunner implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        jobLauncher.run(loadTransactionsJob, new JobParameters());
+
+        // Load the good file
+        jobLauncher.run(loadTransactionsJob,
+            new JobParametersBuilder()
+                .addString("fileName", "ach_20250307.csv")
+                .toJobParameters());
+
+        // Load the bad file
+        jobLauncher.run(loadTransactionsJob,
+            new JobParametersBuilder()
+                .addString("fileName", "ach_20250308_bad.csv")
+                .toJobParameters());
+
+        // Validate all staged records
         jobLauncher.run(validateTransactionsJob, new JobParameters());
+
+        // Post validated records
         jobLauncher.run(postTransactionsJob, new JobParameters());
+
+        // Reconcile
         jobLauncher.run(reconcileJob, new JobParameters());
     }
 }

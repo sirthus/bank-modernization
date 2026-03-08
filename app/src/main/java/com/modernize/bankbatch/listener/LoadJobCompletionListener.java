@@ -17,34 +17,32 @@ public class LoadJobCompletionListener implements JobExecutionListener {
 
     @Override
     public void afterJob(JobExecution jobExecution) {
+        int batchJobId = jobExecution.getExecutionContext().getInt("batchJobId");
+        int batchId = jobExecution.getExecutionContext().getInt("batchId");
+
         if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
 
-            // Count how many staged records were loaded
+            // Count only records in this specific batch
             Integer count = jdbcTemplate.queryForObject(
-                "SELECT count(*) FROM bank.staged_transactions WHERE status = 'staged'",
-                Integer.class);
+                "SELECT count(*) FROM bank.staged_transactions WHERE batch_id = ?",
+                Integer.class, batchId);
 
-            // Update the batch job row
             jdbcTemplate.update(
                 "UPDATE bank.batch_jobs " +
                 "SET status = 'completed', finished_at = now(), record_count = ? " +
-                "WHERE status = 'running'",
-                count);
+                "WHERE id = ?",
+                count, batchJobId);
 
-            // Update the transaction batch row
             jdbcTemplate.update(
-                "UPDATE bank.transaction_batches " +
-                "SET record_count = ? " +
-                "WHERE record_count IS NULL",
-                count);
+                "UPDATE bank.transaction_batches SET record_count = ? WHERE id = ?",
+                count, batchId);
 
         } else {
 
-            // Mark the job as failed
             jdbcTemplate.update(
                 "UPDATE bank.batch_jobs " +
-                "SET status = 'failed', finished_at = now() " +
-                "WHERE status = 'running'");
+                "SET status = 'failed', finished_at = now() WHERE id = ?",
+                batchJobId);
         }
     }
 }
