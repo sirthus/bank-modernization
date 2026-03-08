@@ -2,6 +2,7 @@ package com.modernize.bankbatch.model;
 
 public class StagedTransaction {
 
+    private Integer id;
     private Integer batchId;
     private Integer accountId;
     private Integer merchantId;
@@ -9,6 +10,20 @@ public class StagedTransaction {
     private Integer amountCents;
     private String txnDate;
     private String status;
+
+    // Not a database column — carries validation errors through the pipeline
+    private String errorMessage;
+
+    // Not a database column — carries the account status from the join query
+    private String accountStatus;
+
+    public Integer getId() {
+        return id;
+    }
+
+    public void setId(Integer id) {
+        this.id = id;
+    }
 
     public Integer getBatchId() {
         return batchId;
@@ -65,4 +80,20 @@ public class StagedTransaction {
     public void setStatus(String status) {
         this.status = status;
     }
-}	
+
+    public String getErrorMessage() {
+        return errorMessage;
+    }
+
+    public void setErrorMessage(String errorMessage) {
+        this.errorMessage = errorMessage;
+    }
+
+    public String getAccountStatus() {
+        return accountStatus;
+    }
+
+    public void setAccountStatus(String accountStatus) {
+        this.accountStatus = accountStatus;
+    }
+}
