@@ -1,0 +1,9 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/modernize_buildtest
+    username: postgres
+    password: postgres
+
+  batch:
+    jdbc:
+      initialize-schema: always
