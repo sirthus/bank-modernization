@@ -1,4 +1,4 @@
--- 009_seed_small_data.sql
+-- 012_seed_small_data.sql
 -- Small controlled seed set for rebuild validation.
 
 INSERT INTO bank.customers (customer_id, full_name, email, phone, created_at)

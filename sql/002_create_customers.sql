@@ -1,7 +1,9 @@
+-- 002_create_customers.sql
+
 CREATE TABLE bank.customers (
-    customer_id bigint NOT NULL,
-    full_name text NOT NULL,
-    email text NOT NULL,
-    phone text,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    customer_id     INTEGER         NOT NULL PRIMARY KEY,
+    full_name       TEXT            NOT NULL,
+    email           TEXT            NOT NULL,
+    phone           TEXT,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now()
 );

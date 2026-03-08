@@ -1,4 +1,4 @@
--- 011_create_transaction_batches.sql
+-- 008_create_transaction_batches.sql
 -- Represents a group of inbound transactions that arrived together.
 
 CREATE TABLE bank.transaction_batches (

@@ -1,4 +1,4 @@
--- 018_create_batch_reconciliations.sql
+-- 011_create_batch_reconciliations.sql
 -- Stores reconciliation results comparing staged posts against production.
 
 CREATE TABLE bank.batch_reconciliations (

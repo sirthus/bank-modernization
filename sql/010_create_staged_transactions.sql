@@ -1,4 +1,4 @@
--- 013_create_staged_transactions.sql
+-- 010_create_staged_transactions.sql
 -- Holds inbound transactions before validation and posting.
 
 CREATE TABLE bank.staged_transactions (

@@ -1,4 +1,4 @@
--- 010_create_batch_jobs.sql
+-- 007_create_batch_jobs.sql
 -- Tracks each execution of a batch process.
 
 CREATE TABLE bank.batch_jobs (

@@ -1,10 +1,9 @@
 -- 005_create_transactions.sql
--- Production transactions table.
 
 CREATE TABLE bank.transactions (
     txn_id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    account_id      INTEGER         NOT NULL,
-    merchant_id     INTEGER,
+    account_id      INTEGER         NOT NULL REFERENCES bank.accounts(account_id),
+    merchant_id     INTEGER         REFERENCES bank.merchants(merchant_id),
     direction       CHAR(1)         NOT NULL,
     amount_cents    INTEGER         NOT NULL,
     status          TEXT            NOT NULL DEFAULT 'posted',

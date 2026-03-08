@@ -1,3 +1,5 @@
+-- 006_create_indexes.sql
+
 CREATE INDEX accounts_customer_id_idx
     ON bank.accounts (customer_id);
 

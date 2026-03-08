@@ -1,4 +1,4 @@
--- 012_create_batch_job_errors.sql
+-- 009_create_batch_job_errors.sql
 -- Captures errors that occur during a batch job run.
 
 CREATE TABLE bank.batch_job_errors (
