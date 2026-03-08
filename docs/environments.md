@@ -1,144 +1,91 @@
-\# Environment Roles
-
-
+# Environment Roles
 
 This document defines the database environments used in this project,
-
 what each one is for, and the rules for working with them.
 
+## Databases
 
-
-\## Databases
-
-
-
-\### modernize
-
-
+### modernize
 
 Main working database.
-
 Contains the full development dataset.
 
-
-
-This database is \*\*not disposable\*\*.
-
+This database is **not disposable**.
 It was populated once with generated sample data and is the primary workspace
-
 for development and exploratory queries.
-
 Do not drop or rebuild this database without deliberate intent.
 
-
-
-No automated scripts currently target this database for destructive operations.
-
-
-
-\### modernize\_buildtest
-
-
+### modernize_buildtest
 
 Disposable sandbox database.
-
 Used to prove that the SQL scripts in `sql/` can rebuild the schema
+and seed data from scratch, and to run the Spring Batch pipeline
+against a known clean state.
 
-and seed data from scratch.
-
-
-
-Contains a small, controlled seed set.
-
-
-
-This database \*\*can be dropped and rebuilt at any time\*\*.
-
+This database **can be dropped and rebuilt at any time**.
 That is its entire purpose.
 
+## Spring profiles
 
+The Spring Boot application uses profiles to select which database to target.
+Profile-specific configuration files are in `app/src/main/resources/`.
 
-\## Scripts and what they target
+| Profile | Database | Config file | Usage |
+|---|---|---|---|
+| `test` (default) | `modernize_buildtest` | `application-test.yml` | Normal development and testing |
+| `dev` | `modernize` | `application-dev.yml` | Working with the main dataset |
 
+The base `application.yml` sets the default profile to `test` and holds
+shared settings (batch configuration, job auto-launch disabled).
 
+To switch profiles:
+
+    mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+
+Note: the `dev` database must have all schema tables created before running
+the Spring pipeline against it. Use the SQL build scripts to add any missing
+tables.
+
+## Scripts and what they target
 
 | Script | Target database | What it does |
-
 |---|---|---|
+| `scripts/reset-buildtest.ps1` | `modernize_buildtest` | Drops the database, recreates it, rebuilds schema, loads seed data, verifies |
+| `scripts/build-schema.ps1` | `modernize_buildtest` | Runs the SQL build files in order against the sandbox |
+| `scripts/verify-buildtest.ps1` | `modernize_buildtest` | Checks tables, counts, joins, batch status, errors, reconciliation |
 
-| `scripts/reset-buildtest.ps1` | `modernize\_buildtest` | Drops the database, recreates it, rebuilds the schema, loads seed data |
+No script currently targets `modernize` for destructive operations.
 
-| `scripts/verify-buildtest.ps1` | `modernize\_buildtest` | Checks table existence, row counts, and join integrity |
-
-| `scripts/build-schema.ps1` | `modernize\_buildtest` | Runs the SQL build files in order against the sandbox |
-
-
-
-No script currently targets `modernize`.
-
-
-
-\## SQL build order
-
-
+## SQL build order
 
 These files are applied in sequence by the build and reset scripts:
 
+    001_create_schema.sql
+    002_create_customers.sql
+    003_create_accounts.sql
+    004_create_merchants.sql
+    005_create_transactions.sql
+    006_create_indexes.sql
+    007_create_batch_jobs.sql
+    008_create_transaction_batches.sql
+    009_create_batch_job_errors.sql
+    010_create_staged_transactions.sql
+    011_create_batch_reconciliations.sql
+    012_seed_data.sql
 
+Primary keys and foreign keys are defined inline in the table creation
+scripts. Indexes are kept in a separate file (006) as an independent concern.
+Seed data is last so all tables exist before any inserts.
 
-1\. `001\_create\_schema.sql`
-
-2\. `002\_create\_customers.sql`
-
-3\. `003\_create\_accounts.sql`
-
-4\. `004\_create\_merchants.sql`
-
-5\. `005\_create\_transactions.sql`
-
-6\. `006\_primary\_keys.sql`
-
-7\. `007\_foreign\_keys.sql`
-
-8\. `008\_foreign\_key\_indexes.sql`
-
-9\. `009\_seed\_small\_data.sql`
-
-
-
-\## How data gets into each database
-
-
+## How data gets into each database
 
 | Database | Population method |
-
 |---|---|
-
 | `modernize` | One-time generated dataset, already loaded |
+| `modernize_buildtest` | Schema rebuilt from `sql/` scripts by reset-buildtest.ps1, then Spring Batch pipeline loads inbound CSV data |
 
-| `modernize\_buildtest` | Rebuilt from `sql/` scripts every time `reset-buildtest.ps1` runs |
-
-
-
-\## Docker Compose
-
-
+## Docker Compose
 
 Both databases are hosted by the same PostgreSQL 18 container
-
 defined in `docker-compose.yml`.
-
 Start with `docker compose up -d` from the repo root.
-
-
-
-\## Future direction
-
-
-
-As the project grows, scripts may accept a database name parameter
-
-so that schema operations can target either database explicitly.
-
-A full dev/test/staging/prod separation is not planned at this stage.
-

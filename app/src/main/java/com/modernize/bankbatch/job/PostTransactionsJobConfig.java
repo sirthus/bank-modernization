@@ -12,9 +12,11 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
+import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -46,8 +48,8 @@ public class PostTransactionsJobConfig {
     }
 
     @Bean
-    public JdbcCursorItemReader<StagedTransaction> validatedTransactionReader(DataSource dataSource) {
-        return new JdbcCursorItemReaderBuilder<StagedTransaction>()
+    public SynchronizedItemStreamReader<StagedTransaction> validatedTransactionReader(DataSource dataSource) {
+        JdbcCursorItemReader<StagedTransaction> reader = new JdbcCursorItemReaderBuilder<StagedTransaction>()
                 .name("validatedTransactionReader")
                 .dataSource(dataSource)
                 .sql("SELECT id, account_id, merchant_id, direction, amount_cents, txn_date " +
@@ -65,6 +67,10 @@ public class PostTransactionsJobConfig {
                     return item;
                 })
                 .build();
+
+        SynchronizedItemStreamReader<StagedTransaction> syncReader = new SynchronizedItemStreamReader<>();
+        syncReader.setDelegate(reader);
+        return syncReader;
     }
 
     @Bean
@@ -75,13 +81,18 @@ public class PostTransactionsJobConfig {
     @Bean
     public Step postStep(JobRepository jobRepository,
                          PlatformTransactionManager transactionManager,
-                         JdbcCursorItemReader<StagedTransaction> validatedTransactionReader,
+                         SynchronizedItemStreamReader<StagedTransaction> validatedTransactionReader,
                          PostingWriter postingWriter,
                          ProgressListener progressListener) {
+
+        SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("post-");
+        taskExecutor.setConcurrencyLimit(4);
+
         return new StepBuilder("postStep", jobRepository)
                 .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(validatedTransactionReader)
                 .writer(postingWriter)
+                .taskExecutor(taskExecutor)
                 .listener(progressListener)
                 .build();
     }

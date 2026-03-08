@@ -31,5 +31,5 @@ docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/010_create_stag
 docker cp .\sql\011_create_batch_reconciliations.sql pg18:/tmp/011_create_batch_reconciliations.sql
 docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/011_create_batch_reconciliations.sql
 
-docker cp .\sql\012_seed_small_data.sql pg18:/tmp/012_seed_small_data.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/012_seed_small_data.sql
+docker cp .\sql\012_seed_data.sql pg18:/tmp/012_seed_data.sql
+docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/012_seed_data.sql
