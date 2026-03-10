@@ -18,33 +18,30 @@ public class BatchRunner implements CommandLineRunner {
     private final Job postTransactionsJob;
     private final Job reconcileJob;
     private final BatchSummaryReport summaryReport;
+    private final BatchPipelineProperties pipelineProperties;
 
     public BatchRunner(JobLauncher jobLauncher,
                        @Qualifier("loadTransactionsJob") Job loadTransactionsJob,
                        @Qualifier("validateTransactionsJob") Job validateTransactionsJob,
                        @Qualifier("postTransactionsJob") Job postTransactionsJob,
                        @Qualifier("reconcileJob") Job reconcileJob,
-                       BatchSummaryReport summaryReport) {
+                       BatchSummaryReport summaryReport,
+                       BatchPipelineProperties pipelineProperties) {
         this.jobLauncher = jobLauncher;
         this.loadTransactionsJob = loadTransactionsJob;
         this.validateTransactionsJob = validateTransactionsJob;
         this.postTransactionsJob = postTransactionsJob;
         this.reconcileJob = reconcileJob;
         this.summaryReport = summaryReport;
+        this.pipelineProperties = pipelineProperties;
     }
 
     @Override
     public void run(String... args) throws Exception {
         Date runTimestamp = new Date();
 
-        String[] files = {
-            "ach_20250310.csv",
-            "ach_20250317.csv",
-            "ach_20250324.csv"
-        };
-
-        // Load all inbound files
-        for (String fileName : files) {
+        // Load all inbound files from config
+        for (String fileName : pipelineProperties.getFiles()) {
             jobLauncher.run(loadTransactionsJob,
                 new JobParametersBuilder()
                     .addString("fileName", fileName)

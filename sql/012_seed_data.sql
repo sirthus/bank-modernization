@@ -1,5 +1,5 @@
 -- 012_seed_data.sql
--- Generated seed data: 10,000 customers, ~20,000 accounts, 500 merchants
+-- Generated seed data: 10,000 customers, 19,908 accounts, 500 merchants
 
 INSERT INTO bank.customers (customer_id, full_name, email, phone, created_at)
 VALUES
@@ -30234,7 +30234,7 @@ VALUES
     (3141, 'Xbox #212', 'entertainment', now()),
     (3142, 'OptumRx #286', 'healthcare', now()),
     (3143, 'National Grid #699', 'utilities', now()),
-    (3144, 'Wendy #991', 'dining', now()),
+    (3144, 'Wendys #991', 'dining', now()),
     (3145, 'Via', 'transportation', now()),
     (3146, 'H-E-B', 'groceries', now()),
     (3147, 'Whataburger #381', 'dining', now()),
@@ -30256,7 +30256,7 @@ VALUES
     (3163, 'Nordstrom #968', 'retail', now()),
     (3164, 'Trader Joes #280', 'groceries', now()),
     (3165, 'Lyft', 'transportation', now()),
-    (3166, 'Wendy #711', 'dining', now()),
+    (3166, 'Wendys #711', 'dining', now()),
     (3167, 'Kindle #645', 'entertainment', now()),
     (3168, 'BP #878', 'fuel', now()),
     (3169, 'Cracker Barrel #239', 'dining', now()),
@@ -30310,7 +30310,7 @@ VALUES
     (3217, 'QuikTrip #919', 'fuel', now()),
     (3218, 'Home Depot #135', 'retail', now()),
     (3219, 'Best Buy #773', 'retail', now()),
-    (3220, 'Wendy', 'dining', now()),
+    (3220, 'Wendys', 'dining', now()),
     (3221, 'Minute Clinic #705', 'healthcare', now()),
     (3222, 'Best Buy #818', 'retail', now()),
     (3223, 'Southwest Airlines #740', 'transportation', now()),
@@ -30434,7 +30434,7 @@ VALUES
     (3341, 'Chick-fil-A', 'dining', now()),
     (3342, 'Valero #340', 'fuel', now()),
     (3343, 'Chevron #181', 'fuel', now()),
-    (3344, 'Wendy #881', 'dining', now()),
+    (3344, 'Wendys #881', 'dining', now()),
     (3345, 'United Airlines', 'transportation', now()),
     (3346, 'Marshalls #125', 'retail', now()),
     (3347, 'Sams Club', 'groceries', now()),

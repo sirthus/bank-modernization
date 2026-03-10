@@ -1,9 +1,15 @@
 spring:
   profiles:
-    active: test
+    active: sandbox
 
   batch:
     jdbc:
       initialize-schema: always
     job:
       enabled: false
+
+batch-pipeline:
+  files:
+    - ach_20250310.csv
+    - ach_20250317.csv
+    - ach_20250324.csv

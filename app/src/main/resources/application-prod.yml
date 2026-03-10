@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/modernize_prod
+    username: postgres
+    password: postgres
+
+batch-pipeline:
+  files:
+    - ach_20250310_prod.csv
+    - ach_20250317_prod.csv
+    - ach_20250324_prod.csv

@@ -1,15 +1,25 @@
 import random
 import csv
 import os
+import sys
 from datetime import date, timedelta
 
-random.seed(42)
+# ── Configuration ───────────────────────────────────────────────────
 
-OUTPUT_DIR = "/mnt/user-data/outputs"
-SQL_DIR = os.path.join(OUTPUT_DIR, "sql")
-CSV_DIR = os.path.join(OUTPUT_DIR, "sample-data")
-os.makedirs(SQL_DIR, exist_ok=True)
-os.makedirs(CSV_DIR, exist_ok=True)
+PROFILES = {
+    "standard": {
+        "customers": 10000,
+        "merchants": 500,
+        "csv_records": 50000,
+        "seed_file": "012_seed_data.sql",
+    },
+    "prod": {
+        "customers": 100000,
+        "merchants": 1000,
+        "csv_records": 100000,
+        "seed_file": "012_seed_data_prod.sql",
+    },
+}
 
 # ── Name pools ──────────────────────────────────────────────────────
 
@@ -62,7 +72,7 @@ MERCHANT_CATEGORIES = {
              "Marathon","Sinclair","QuikTrip","Buc-ees","RaceTrac","Wawa",
              "Sheetz","Loves","Pilot"],
     "dining": ["McDonalds","Chick-fil-A","Whataburger","Chipotle","Olive Garden",
-               "Applebees","Dennys","IHOP","Panda Express","Subway","Wendy",
+               "Applebees","Dennys","IHOP","Panda Express","Subway","Wendys",
                "Taco Bell","Panera Bread","Five Guys","Cracker Barrel"],
     "retail": ["Walmart","Target","Amazon","Best Buy","Home Depot","Lowes",
                "Nordstrom","Macys","TJ Maxx","Ross","Dollar General","Dollar Tree",
@@ -81,129 +91,114 @@ MERCHANT_CATEGORIES = {
                        "Avis","Amtrak","Greyhound","DART","Capital Metro","Via","Bolt"],
 }
 
-# ── Generate customers ──────────────────────────────────────────────
+# ── Generate functions ──────────────────────────────────────────────
 
-print("Generating 10,000 customers...")
-customers = []
-used_emails = set()
+def generate_customers(count, seed=42):
+    random.seed(seed)
+    customers = []
+    used_emails = set()
 
-for i in range(10000):
-    cid = 1001 + i
-    first = random.choice(FIRST)
-    last = random.choice(LAST)
-    full_name = f"{first} {last}"
+    for i in range(count):
+        cid = 1001 + i
+        first = random.choice(FIRST)
+        last = random.choice(LAST)
+        full_name = f"{first} {last}"
 
-    base_email = f"{first.lower()}.{last.lower()}"
-    email = f"{base_email}@example.com"
-    counter = 1
-    while email in used_emails:
-        email = f"{base_email}{counter}@example.com"
-        counter += 1
-    used_emails.add(email)
+        base_email = f"{first.lower()}.{last.lower()}"
+        email = f"{base_email}@example.com"
+        counter = 1
+        while email in used_emails:
+            email = f"{base_email}{counter}@example.com"
+            counter += 1
+        used_emails.add(email)
 
-    phone = f"555-{random.randint(1000, 9999)}"
-    customers.append((cid, full_name, email, phone))
+        phone = f"555-{random.randint(1000, 9999)}"
+        customers.append((cid, full_name, email, phone))
 
-# ── Generate accounts ───────────────────────────────────────────────
+    return customers
 
-print("Generating ~20,000 accounts...")
-accounts = []
-account_id = 2001
-account_types = ["checking", "savings", "credit"]
 
-for cid, _, _, _ in customers:
-    # Every customer gets checking
-    accounts.append((account_id, cid, "checking", "active", 0))
-    account_id += 1
+def generate_accounts(customers):
+    accounts = []
+    account_id = 2001
 
-    # ~60% get savings
-    if random.random() < 0.6:
-        accounts.append((account_id, cid, "savings", "active", 0))
+    for cid, _, _, _ in customers:
+        accounts.append((account_id, cid, "checking", "active", 0))
         account_id += 1
 
-    # ~40% get credit
-    if random.random() < 0.4:
-        limit = random.choice([100000, 250000, 500000, 750000, 1000000])
-        accounts.append((account_id, cid, "credit", "active", limit))
-        account_id += 1
+        if random.random() < 0.6:
+            accounts.append((account_id, cid, "savings", "active", 0))
+            account_id += 1
 
-print(f"  Generated {len(accounts)} accounts")
+        if random.random() < 0.4:
+            limit = random.choice([100000, 250000, 500000, 750000, 1000000])
+            accounts.append((account_id, cid, "credit", "active", limit))
+            account_id += 1
 
-# ── Generate merchants ──────────────────────────────────────────────
+    return accounts
 
-print("Generating 500 merchants...")
-merchants = []
-merchant_id = 3001
-all_merchants = []
-for cat, names in MERCHANT_CATEGORIES.items():
-    for name in names:
-        all_merchants.append((name, cat))
 
-# Fill to 500 with numbered variations
-while len(all_merchants) < 500:
-    cat = random.choice(list(MERCHANT_CATEGORIES.keys()))
-    base = random.choice(MERCHANT_CATEGORIES[cat])
-    num = random.randint(100, 999)
-    all_merchants.append((f"{base} #{num}", cat))
+def generate_merchants(count):
+    all_merchants = []
+    for cat, names in MERCHANT_CATEGORIES.items():
+        for name in names:
+            all_merchants.append((name, cat))
 
-random.shuffle(all_merchants)
-all_merchants = all_merchants[:500]
+    while len(all_merchants) < count:
+        cat = random.choice(list(MERCHANT_CATEGORIES.keys()))
+        base = random.choice(MERCHANT_CATEGORIES[cat])
+        num = random.randint(100, 999)
+        all_merchants.append((f"{base} #{num}", cat))
 
-for name, cat in all_merchants:
-    merchants.append((merchant_id, name, cat))
-    merchant_id += 1
+    random.shuffle(all_merchants)
+    all_merchants = all_merchants[:count]
 
-# ── Write seed SQL ──────────────────────────────────────────────────
+    merchants = []
+    merchant_id = 3001
+    for name, cat in all_merchants:
+        merchants.append((merchant_id, name, cat))
+        merchant_id += 1
 
-print("Writing seed SQL...")
-seed_path = os.path.join(SQL_DIR, "012_seed_data.sql")
+    return merchants
 
-with open(seed_path, "w") as f:
-    f.write("-- 012_seed_data.sql\n")
-    f.write("-- Generated seed data: 10,000 customers, ~20,000 accounts, 500 merchants\n\n")
 
-    # Customers in batches of 500
-    for batch_start in range(0, len(customers), 500):
-        batch = customers[batch_start:batch_start + 500]
-        f.write("INSERT INTO bank.customers (customer_id, full_name, email, phone, created_at)\nVALUES\n")
-        lines = []
-        for cid, name, email, phone in batch:
-            name_esc = name.replace("'", "''")
-            lines.append(f"    ({cid}, '{name_esc}', '{email}', '{phone}', now())")
-        f.write(",\n".join(lines) + ";\n\n")
+def write_seed_sql(customers, accounts, merchants, output_path, label):
+    print(f"  Writing {label} seed SQL ({len(customers):,} customers)...")
 
-    # Accounts in batches of 500
-    for batch_start in range(0, len(accounts), 500):
-        batch = accounts[batch_start:batch_start + 500]
-        f.write("INSERT INTO bank.accounts (account_id, customer_id, account_type, status, opened_at, credit_limit_cents)\nVALUES\n")
-        lines = []
-        for aid, cid, atype, status, limit in batch:
-            lines.append(f"    ({aid}, {cid}, '{atype}', '{status}', CURRENT_DATE, {limit})")
-        f.write(",\n".join(lines) + ";\n\n")
+    with open(output_path, "w") as f:
+        f.write(f"-- {os.path.basename(output_path)}\n")
+        f.write(f"-- Generated seed data: {len(customers):,} customers, "
+                f"{len(accounts):,} accounts, {len(merchants):,} merchants\n\n")
 
-    # Merchants in batches of 500
-    f.write("INSERT INTO bank.merchants (merchant_id, name, category, created_at)\nVALUES\n")
-    lines = []
-    for mid, name, cat in merchants:
-        name_esc = name.replace("'", "''")
-        lines.append(f"    ({mid}, '{name_esc}', '{cat}', now())")
-    f.write(",\n".join(lines) + ";\n\n")
+        for batch_start in range(0, len(customers), 500):
+            batch = customers[batch_start:batch_start + 500]
+            f.write("INSERT INTO bank.customers (customer_id, full_name, email, phone, created_at)\nVALUES\n")
+            lines = []
+            for cid, name, email, phone in batch:
+                name_esc = name.replace("'", "''")
+                lines.append(f"    ({cid}, '{name_esc}', '{email}', '{phone}', now())")
+            f.write(",\n".join(lines) + ";\n\n")
 
-print(f"  Seed SQL written to {seed_path}")
+        for batch_start in range(0, len(accounts), 500):
+            batch = accounts[batch_start:batch_start + 500]
+            f.write("INSERT INTO bank.accounts (account_id, customer_id, account_type, status, opened_at, credit_limit_cents)\nVALUES\n")
+            lines = []
+            for aid, cid, atype, status, limit in batch:
+                lines.append(f"    ({aid}, {cid}, '{atype}', '{status}', CURRENT_DATE, {limit})")
+            f.write(",\n".join(lines) + ";\n\n")
 
-# ── Build lookup lists for CSV generation ───────────────────────────
+        for batch_start in range(0, len(merchants), 500):
+            batch = merchants[batch_start:batch_start + 500]
+            f.write("INSERT INTO bank.merchants (merchant_id, name, category, created_at)\nVALUES\n")
+            lines = []
+            for mid, name, cat in batch:
+                name_esc = name.replace("'", "''")
+                lines.append(f"    ({mid}, '{name_esc}', '{cat}', now())")
+            f.write(",\n".join(lines) + ";\n\n")
 
-account_ids = [a[0] for a in accounts]
-checking_accounts = [a[0] for a in accounts if a[2] == "checking"]
-credit_accounts = [a[0] for a in accounts if a[2] == "credit"]
-savings_accounts = [a[0] for a in accounts if a[2] == "savings"]
-merchant_ids = [m[0] for m in merchants]
 
-# ── Generate CSV files ──────────────────────────────────────────────
-
-def generate_batch_csv(filename, num_records, bad_pct, start_date):
-    """Generate an inbound transaction CSV with a percentage of bad records."""
-    path = os.path.join(CSV_DIR, filename)
+def generate_batch_csv(account_ids, merchant_ids, filename, num_records, bad_pct, start_date, output_dir):
+    path = os.path.join(output_dir, filename)
     bad_count = 0
 
     with open(path, "w", newline="") as f:
@@ -228,41 +223,106 @@ def generate_batch_csv(filename, num_records, bad_pct, start_date):
                 elif bad_type == "bad_direction":
                     acct = random.choice(account_ids)
                     mid = random.choice(merchant_ids)
-                    writer.writerow([acct, mid, random.choice(["X", "Z", "B"]), random.randint(100, 50000), txn_date])
+                    writer.writerow([acct, mid, random.choice(["X", "Z", "B"]),
+                                     random.randint(100, 50000), txn_date])
             else:
-                # Normal transaction
-                is_credit = random.random() < 0.2  # 20% credits
+                is_credit = random.random() < 0.2
 
                 if is_credit:
                     acct = random.choice(account_ids)
                     amount = random.choice([
-                        random.randint(50000, 500000),   # payroll-sized
-                        random.randint(1000, 25000),     # small transfers
-                        random.randint(100, 5000),       # refunds
+                        random.randint(50000, 500000),
+                        random.randint(1000, 25000),
+                        random.randint(100, 5000),
                     ])
                     writer.writerow([acct, "", "C", amount, txn_date])
                 else:
                     acct = random.choice(account_ids)
                     mid = random.choice(merchant_ids)
-                    amount = random.randint(100, 75000)  # $1 to $750
+                    amount = random.randint(100, 75000)
                     writer.writerow([acct, mid, "D", amount, txn_date])
 
-    print(f"  {filename}: {num_records} records ({bad_count} bad, {num_records - bad_count} good)")
-    return path
+    print(f"  {filename}: {num_records:,} records ({bad_count:,} bad, {num_records - bad_count:,} good)")
 
-print("\nGenerating inbound CSV files...")
 
-# Batch 1: clean week, 2% bad
-generate_batch_csv("ach_20250310.csv", 50000, 0.02, date(2025, 3, 10))
+# ── Main ────────────────────────────────────────────────────────────
 
-# Batch 2: slightly messier, 5% bad
-generate_batch_csv("ach_20250317.csv", 50000, 0.05, date(2025, 3, 17))
+def main():
+    profile = sys.argv[1] if len(sys.argv) > 1 else "all"
 
-# Batch 3: rough week, 8% bad
-generate_batch_csv("ach_20250324.csv", 50000, 0.08, date(2025, 3, 24))
+    if profile not in ("standard", "prod", "all"):
+        print(f"Usage: python generate_data.py [standard|prod|all]")
+        print(f"  standard  - 10k customers, 500 merchants")
+        print(f"  prod      - 100k customers, 1000 merchants")
+        print(f"  all       - generate both (default)")
+        sys.exit(1)
 
-print("\nDone!")
-print(f"  Customers: {len(customers)}")
-print(f"  Accounts:  {len(accounts)}")
-print(f"  Merchants: {len(merchants)}")
-print(f"  CSV files: 3 x 50,000 records")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    sql_dir = os.path.join(script_dir, "..", "sql")
+    csv_dir = os.path.join(script_dir, "..", "sample-data")
+    resources_dir = os.path.join(script_dir, "..", "app", "src", "main", "resources")
+    os.makedirs(sql_dir, exist_ok=True)
+    os.makedirs(csv_dir, exist_ok=True)
+    os.makedirs(resources_dir, exist_ok=True)
+
+    profiles_to_run = [profile] if profile != "all" else ["standard", "prod"]
+
+    for p in profiles_to_run:
+        cfg = PROFILES[p]
+        print(f"\n=== Generating {p} dataset ===")
+
+        customers = generate_customers(cfg["customers"], seed=42 if p == "standard" else 99)
+        accounts = generate_accounts(customers)
+        merchants = generate_merchants(cfg["merchants"])
+
+        print(f"  Customers: {len(customers):,}")
+        print(f"  Accounts:  {len(accounts):,}")
+        print(f"  Merchants: {len(merchants):,}")
+
+        write_seed_sql(customers, accounts, merchants,
+                       os.path.join(sql_dir, cfg["seed_file"]), p)
+
+        account_ids = [a[0] for a in accounts]
+        merchant_ids = [m[0] for m in merchants]
+
+        if p == "standard":
+            print(f"\n  Generating standard inbound CSV files...")
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250310.csv", cfg["csv_records"], 0.02,
+                               date(2025, 3, 10), csv_dir)
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250317.csv", cfg["csv_records"], 0.05,
+                               date(2025, 3, 17), csv_dir)
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250324.csv", cfg["csv_records"], 0.08,
+                               date(2025, 3, 24), csv_dir)
+
+            for f in ["ach_20250310.csv", "ach_20250317.csv", "ach_20250324.csv"]:
+                src = os.path.join(csv_dir, f)
+                dst = os.path.join(resources_dir, f)
+                with open(src, "r") as s, open(dst, "w") as d:
+                    d.write(s.read())
+
+        if p == "prod":
+            print(f"\n  Generating prod inbound CSV files...")
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250310_prod.csv", cfg["csv_records"], 0.02,
+                               date(2025, 3, 10), csv_dir)
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250317_prod.csv", cfg["csv_records"], 0.05,
+                               date(2025, 3, 17), csv_dir)
+            generate_batch_csv(account_ids, merchant_ids,
+                               "ach_20250324_prod.csv", cfg["csv_records"], 0.08,
+                               date(2025, 3, 24), csv_dir)
+
+            for f in ["ach_20250310_prod.csv", "ach_20250317_prod.csv", "ach_20250324_prod.csv"]:
+                src = os.path.join(csv_dir, f)
+                dst = os.path.join(resources_dir, f)
+                with open(src, "r") as s, open(dst, "w") as d:
+                    d.write(s.read())
+
+    print("\nDone!")
+
+
+if __name__ == "__main__":
+    main()

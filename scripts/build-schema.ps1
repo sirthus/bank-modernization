@@ -1,35 +1,35 @@
-docker cp .\sql\001_create_schema.sql pg18:/tmp/001_create_schema.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/001_create_schema.sql
+param(
+    [Parameter(Mandatory=$true)]
+    [string]$Database
+)
 
-docker cp .\sql\002_create_customers.sql pg18:/tmp/002_create_customers.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/002_create_customers.sql
+$files = @(
+    "001_create_schema.sql",
+    "002_create_customers.sql",
+    "003_create_accounts.sql",
+    "004_create_merchants.sql",
+    "005_create_transactions.sql",
+    "006_create_indexes.sql",
+    "007_create_batch_jobs.sql",
+    "008_create_transaction_batches.sql",
+    "009_create_batch_job_errors.sql",
+    "010_create_staged_transactions.sql",
+    "011_create_batch_reconciliations.sql"
+)
 
-docker cp .\sql\003_create_accounts.sql pg18:/tmp/003_create_accounts.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/003_create_accounts.sql
+foreach ($file in $files) {
+    docker cp ".\sql\$file" "pg18:/tmp/$file" 2>$null
+    docker exec pg18 psql -q -U postgres -d $Database -f "/tmp/$file"
+}
 
-docker cp .\sql\004_create_merchants.sql pg18:/tmp/004_create_merchants.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/004_create_merchants.sql
+# Seed data - prod gets the large dataset, everything else gets standard
+if ($Database -eq "modernize_prod") {
+    $seedFile = "012_seed_data_prod.sql"
+} else {
+    $seedFile = "012_seed_data.sql"
+}
 
-docker cp .\sql\005_create_transactions.sql pg18:/tmp/005_create_transactions.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/005_create_transactions.sql
-
-docker cp .\sql\006_create_indexes.sql pg18:/tmp/006_create_indexes.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/006_create_indexes.sql
-
-docker cp .\sql\007_create_batch_jobs.sql pg18:/tmp/007_create_batch_jobs.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/007_create_batch_jobs.sql
-
-docker cp .\sql\008_create_transaction_batches.sql pg18:/tmp/008_create_transaction_batches.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/008_create_transaction_batches.sql
-
-docker cp .\sql\009_create_batch_job_errors.sql pg18:/tmp/009_create_batch_job_errors.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/009_create_batch_job_errors.sql
-
-docker cp .\sql\010_create_staged_transactions.sql pg18:/tmp/010_create_staged_transactions.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/010_create_staged_transactions.sql
-
-docker cp .\sql\011_create_batch_reconciliations.sql pg18:/tmp/011_create_batch_reconciliations.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/011_create_batch_reconciliations.sql
-
-docker cp .\sql\012_seed_data.sql pg18:/tmp/012_seed_data.sql
-docker exec pg18 psql -U postgres -d modernize_buildtest -f /tmp/012_seed_data.sql
+Write-Host "Loading seed data ($seedFile)..."
+docker cp ".\sql\$seedFile" "pg18:/tmp/$seedFile" 2>$null
+docker exec pg18 psql -q -U postgres -d $Database -f "/tmp/$seedFile"
+Write-Host "Seed data loaded."

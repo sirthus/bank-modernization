@@ -3,17 +3,20 @@ package com.modernize.bankbatch.job;
 import com.modernize.bankbatch.listener.PostJobCompletionListener;
 import com.modernize.bankbatch.listener.ProgressListener;
 import com.modernize.bankbatch.model.StagedTransaction;
+import com.modernize.bankbatch.partitioner.BatchIdPartitioner;
 import com.modernize.bankbatch.writer.PostingWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.partition.support.Partitioner;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
-import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -48,13 +51,22 @@ public class PostTransactionsJobConfig {
     }
 
     @Bean
-    public SynchronizedItemStreamReader<StagedTransaction> validatedTransactionReader(DataSource dataSource) {
-        JdbcCursorItemReader<StagedTransaction> reader = new JdbcCursorItemReaderBuilder<StagedTransaction>()
-                .name("validatedTransactionReader")
+    public Partitioner postPartitioner(JdbcTemplate jdbcTemplate) {
+        return new BatchIdPartitioner(jdbcTemplate, "validated");
+    }
+
+    @Bean
+    @StepScope
+    public JdbcCursorItemReader<StagedTransaction> partitionedValidatedReader(
+            DataSource dataSource,
+            @Value("#{stepExecutionContext['batchId']}") Integer batchId) {
+        return new JdbcCursorItemReaderBuilder<StagedTransaction>()
+                .name("partitionedValidatedReader")
                 .dataSource(dataSource)
                 .sql("SELECT id, account_id, merchant_id, direction, amount_cents, txn_date " +
                      "FROM bank.staged_transactions " +
-                     "WHERE status = 'validated'")
+                     "WHERE status = 'validated' AND batch_id = ?")
+                .queryArguments(batchId)
                 .rowMapper((rs, rowNum) -> {
                     StagedTransaction item = new StagedTransaction();
                     item.setId(rs.getInt("id"));
@@ -67,10 +79,6 @@ public class PostTransactionsJobConfig {
                     return item;
                 })
                 .build();
-
-        SynchronizedItemStreamReader<StagedTransaction> syncReader = new SynchronizedItemStreamReader<>();
-        syncReader.setDelegate(reader);
-        return syncReader;
     }
 
     @Bean
@@ -79,21 +87,31 @@ public class PostTransactionsJobConfig {
     }
 
     @Bean
+    public Step postWorkerStep(JobRepository jobRepository,
+                               PlatformTransactionManager transactionManager,
+                               JdbcCursorItemReader<StagedTransaction> partitionedValidatedReader,
+                               PostingWriter postingWriter,
+                               ProgressListener progressListener) {
+        return new StepBuilder("postWorkerStep", jobRepository)
+                .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
+                .reader(partitionedValidatedReader)
+                .writer(postingWriter)
+                .listener(progressListener)
+                .build();
+    }
+
+    @Bean
     public Step postStep(JobRepository jobRepository,
-                         PlatformTransactionManager transactionManager,
-                         SynchronizedItemStreamReader<StagedTransaction> validatedTransactionReader,
-                         PostingWriter postingWriter,
-                         ProgressListener progressListener) {
+                         Step postWorkerStep,
+                         Partitioner postPartitioner) {
 
         SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("post-");
         taskExecutor.setConcurrencyLimit(4);
 
         return new StepBuilder("postStep", jobRepository)
-                .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
-                .reader(validatedTransactionReader)
-                .writer(postingWriter)
+                .partitioner("postWorkerStep", postPartitioner)
+                .step(postWorkerStep)
                 .taskExecutor(taskExecutor)
-                .listener(progressListener)
                 .build();
     }
 

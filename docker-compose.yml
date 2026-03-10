@@ -3,7 +3,6 @@ services:
     image: postgres:18
     container_name: pg18
     environment:
-      POSTGRES_DB: modernize
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:

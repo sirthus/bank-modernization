@@ -5,18 +5,21 @@ import com.modernize.bankbatch.listener.ProgressListener;
 import com.modernize.bankbatch.listener.ValidateJobCompletionListener;
 import com.modernize.bankbatch.listener.ValidationSkipListener;
 import com.modernize.bankbatch.model.StagedTransaction;
+import com.modernize.bankbatch.partitioner.BatchIdPartitioner;
 import com.modernize.bankbatch.processor.ValidationProcessor;
 import com.modernize.bankbatch.writer.ValidationWriter;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.Step;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.builder.JobBuilder;
+import org.springframework.batch.core.partition.support.Partitioner;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.core.step.tasklet.Tasklet;
 import org.springframework.batch.item.database.JdbcCursorItemReader;
 import org.springframework.batch.item.database.builder.JdbcCursorItemReaderBuilder;
-import org.springframework.batch.item.support.SynchronizedItemStreamReader;
 import org.springframework.batch.repeat.RepeatStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
@@ -58,16 +61,25 @@ public class ValidateTransactionsJobConfig {
     }
 
     @Bean
-    public SynchronizedItemStreamReader<StagedTransaction> stagedTransactionReader(DataSource dataSource) {
-        JdbcCursorItemReader<StagedTransaction> reader = new JdbcCursorItemReaderBuilder<StagedTransaction>()
-                .name("stagedTransactionReader")
+    public Partitioner validatePartitioner(JdbcTemplate jdbcTemplate) {
+        return new BatchIdPartitioner(jdbcTemplate, "staged");
+    }
+
+    @Bean
+    @StepScope
+    public JdbcCursorItemReader<StagedTransaction> partitionedStagedReader(
+            DataSource dataSource,
+            @Value("#{stepExecutionContext['batchId']}") Integer batchId) {
+        return new JdbcCursorItemReaderBuilder<StagedTransaction>()
+                .name("partitionedStagedReader")
                 .dataSource(dataSource)
                 .sql("SELECT st.id, st.account_id, st.merchant_id, st.direction, " +
                      "       st.amount_cents, st.txn_date, st.status, " +
                      "       a.status AS account_status " +
                      "FROM bank.staged_transactions st " +
                      "LEFT JOIN bank.accounts a ON st.account_id = a.account_id " +
-                     "WHERE st.status = 'staged'")
+                     "WHERE st.status = 'staged' AND st.batch_id = ?")
+                .queryArguments(batchId)
                 .rowMapper((rs, rowNum) -> {
                     StagedTransaction item = new StagedTransaction();
                     item.setId(rs.getInt("id"));
@@ -82,10 +94,6 @@ public class ValidateTransactionsJobConfig {
                     return item;
                 })
                 .build();
-
-        SynchronizedItemStreamReader<StagedTransaction> syncReader = new SynchronizedItemStreamReader<>();
-        syncReader.setDelegate(reader);
-        return syncReader;
     }
 
     @Bean
@@ -94,28 +102,38 @@ public class ValidateTransactionsJobConfig {
     }
 
     @Bean
-    public Step validateStep(JobRepository jobRepository,
-                             PlatformTransactionManager transactionManager,
-                             SynchronizedItemStreamReader<StagedTransaction> stagedTransactionReader,
-                             ValidationProcessor validationProcessor,
-                             ValidationWriter validationWriter,
-                             ValidationSkipListener skipListener,
-                             ProgressListener progressListener) {
-
-        SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("validate-");
-        taskExecutor.setConcurrencyLimit(4);
-
-        return new StepBuilder("validateStep", jobRepository)
+    public Step validateWorkerStep(JobRepository jobRepository,
+                                   PlatformTransactionManager transactionManager,
+                                   JdbcCursorItemReader<StagedTransaction> partitionedStagedReader,
+                                   ValidationProcessor validationProcessor,
+                                   ValidationWriter validationWriter,
+                                   ValidationSkipListener skipListener,
+                                   ProgressListener progressListener) {
+        return new StepBuilder("validateWorkerStep", jobRepository)
                 .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
-                .reader(stagedTransactionReader)
+                .reader(partitionedStagedReader)
                 .processor(validationProcessor)
                 .writer(validationWriter)
-                .taskExecutor(taskExecutor)
                 .faultTolerant()
                 .skip(ValidationException.class)
                 .skipLimit(10000)
                 .listener(skipListener)
                 .listener(progressListener)
+                .build();
+    }
+
+    @Bean
+    public Step validateStep(JobRepository jobRepository,
+                             Step validateWorkerStep,
+                             Partitioner validatePartitioner) {
+
+        SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("validate-");
+        taskExecutor.setConcurrencyLimit(4);
+
+        return new StepBuilder("validateStep", jobRepository)
+                .partitioner("validateWorkerStep", validatePartitioner)
+                .step(validateWorkerStep)
+                .taskExecutor(taskExecutor)
                 .build();
     }
 
