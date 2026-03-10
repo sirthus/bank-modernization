@@ -11,12 +11,15 @@ Learning project for batch processing modernization using:
 ## What it does
 
 This project simulates a bank's batch transaction processing pipeline.
-Inbound CSV files containing transactions are loaded into a staging area,
-validated against business rules, posted to a production table, and
-reconciled. The pipeline is built in Spring Batch with multi-threaded
-processing and produces a summary report after each run.
+Inbound CSV files are loaded into staging, validated against business
+rules, posted to a production table, and reconciled. The pipeline is
+built in Spring Batch and uses partitioned processing for validate and
+post steps.
 
-For pipeline architecture details, see [docs/batch-pipeline.md](docs/batch-pipeline.md).
+Supporting docs:
+
+- [docs/environments.md](docs/environments.md)
+- [docs/batch-pipeline.md](docs/batch-pipeline.md)
 
 ## Prerequisites
 
@@ -40,57 +43,55 @@ Start PostgreSQL:
 
     docker compose up -d
 
-Reset and rebuild the sandbox database. This drops and recreates
-`modernize_buildtest`, then runs the SQL files listed under
-**SQL build order** below in sequence to create the schema and load
-seed data. It finishes by running the verify script to confirm
-everything built correctly:
+Create or rebuild all environments:
 
-    .\scripts\reset-buildtest.ps1
+    .\scripts\setup-environments.ps1
 
-Verify the database state at any time:
+Reset one environment:
 
-    .\scripts\verify-buildtest.ps1
+    .\scripts\reset-env.ps1 -Database modernize_buildtest
 
-Run the Spring Batch pipeline:
+Verify one environment:
+
+    .\scripts\verify-env.ps1 -Database modernize_test
+
+Run the pipeline against the default sandbox profile:
 
     cd app
     mvn spring-boot:run
 
-The pipeline loads three inbound CSV files (150,000 transactions),
-validates them, posts the good ones, reconciles, and prints a summary
-report. A timestamped report file is saved to `app/reports/`.
+Run against a specific profile:
 
-## Databases and environments
+    mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+    mvn spring-boot:run "-Dspring-boot.run.profiles=test"
+    mvn spring-boot:run "-Dspring-boot.run.profiles=prod"
 
-- `modernize` - main working database
-- `modernize_buildtest` - disposable sandbox, rebuilt by reset-buildtest.ps1
+## Environments
 
-The Spring Boot application uses profiles to select which database to
-target. Default is `test` (sandbox). See
-[docs/environments.md](docs/environments.md) for details.
+This repo uses four Spring profiles and four databases:
 
-## SQL build order
+- `sandbox` -> `modernize_buildtest`
+- `dev` -> `modernize_dev`
+- `test` -> `modernize_test`
+- `prod` -> `modernize_prod`
 
-These files are run in sequence by `scripts/build-schema.ps1`, which is
-called by `scripts/reset-buildtest.ps1`:
+For details on environments, scripts, and promotion flow, see
+[docs/environments.md](docs/environments.md).
 
-    001_create_schema.sql
-    002_create_customers.sql
-    003_create_accounts.sql
-    004_create_merchants.sql
-    005_create_transactions.sql
-    006_create_indexes.sql
-    007_create_batch_jobs.sql
-    008_create_transaction_batches.sql
-    009_create_batch_job_errors.sql
-    010_create_staged_transactions.sql
-    011_create_batch_reconciliations.sql
-    012_seed_data.sql
+## Branch flow
+
+Changes move through:
+
+    dev -> test -> main
+
+Work is done on `dev`, verified on `test`, then promoted to `main`.
 
 ## Scripts
 
-- `scripts/reset-buildtest.ps1` - drops and rebuilds the sandbox database
-- `scripts/build-schema.ps1` - runs SQL files in order against the sandbox
-- `scripts/verify-buildtest.ps1` - verifies database state
+- `scripts/setup-environments.ps1` - creates and builds all environments
+- `scripts/reset-env.ps1` - resets one named environment
+- `scripts/verify-env.ps1` - verifies one named environment
+- `scripts/reset-buildtest.ps1` - sandbox-only convenience reset
+- `scripts/verify-buildtest.ps1` - sandbox-only convenience verify
+- `scripts/build-schema.ps1` - runs SQL files in order against a target database
 - `scripts/generate_data.py` - generates seed SQL and inbound CSV files
