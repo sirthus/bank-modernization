@@ -21,15 +21,15 @@ execution. The `BatchRunner` class orchestrates the sequence.
         v
     [Validate Job]
         |-- creates batch_jobs row (validate_transactions)
-        |-- reads staged records joined with accounts
-        |-- applies business rules
+        |-- partitions staged records by batch_id
+        |-- applies business rules in worker steps
         |-- good records: status -> validated
         |-- bad records: status -> rejected, error logged to batch_job_errors
         v
     [Post Job]
         |-- creates batch_jobs row (post_transactions)
-        |-- reads validated records
-        |-- inserts into production transactions table
+        |-- partitions validated records by batch_id
+        |-- posts validated records in worker steps
         |-- staged status -> posted
         v
     [Reconcile Job]
@@ -57,12 +57,13 @@ each file gets its own instances with the correct filename parameter.
 
 ### Validate (validateTransactionsJob)
 
-Runs once, processing all staged records from all loaded files.
+Runs once, processing staged records from all loaded files.
 
 | Step | Type | What it does |
 |---|---|---|
 | validateSetupStep | Tasklet | Creates batch_jobs row |
-| validateStep | Chunk (500), 4 threads | SynchronizedItemStreamReader -> ValidationProcessor -> ValidationWriter |
+| validateStep | Partitioned master step | Builds one partition per `batch_id` with staged records |
+| validateWorkerStep | Chunk (500) | Reads one partition's staged records, validates them, writes updates |
 
 Validation rules:
 - amount_cents must be positive
@@ -70,9 +71,10 @@ Validation rules:
 - account must exist
 - account must be active
 
-The validate step uses a **skip policy**: when the processor throws a
-`ValidationException`, Spring Batch skips the record (up to 10,000 skips)
-and the `ValidationSkipListener` marks it rejected and logs the error.
+The validate worker step uses a **skip policy**: when the processor
+throws a `ValidationException`, Spring Batch skips the record
+(up to 10,000 skips) and the `ValidationSkipListener` marks it rejected
+and logs the error.
 
 ### Post (postTransactionsJob)
 
@@ -81,10 +83,11 @@ Runs once, posting all validated records.
 | Step | Type | What it does |
 |---|---|---|
 | postSetupStep | Tasklet | Creates batch_jobs row |
-| postStep | Chunk (500), 4 threads | SynchronizedItemStreamReader -> PostingWriter |
+| postStep | Partitioned master step | Builds one partition per `batch_id` with validated records |
+| postWorkerStep | Chunk (500) | Reads one partition's validated records and posts them |
 
-The PostingWriter inserts each record into the production `transactions`
-table and updates the staged status to `posted`.
+The `PostingWriter` inserts each record into the production
+`transactions` table and updates the staged status to `posted`.
 
 ### Reconcile (reconcileJob)
 
@@ -97,12 +100,21 @@ Runs once, checking all batches.
 Reconciliation matches staged posted records to production by
 account_id, merchant_id, direction, and amount_cents.
 
-## Concurrency
+## Partitioning
 
-The validate and post steps use `SimpleAsyncTaskExecutor` with a
-concurrency limit of 4. The `JdbcCursorItemReader` is wrapped in a
-`SynchronizedItemStreamReader` so that reads are serialized while
-processing and writing happen in parallel across threads.
+The validate and post jobs now use partitioned steps instead of async
+chunking over a shared reader.
+
+`BatchIdPartitioner`:
+- queries distinct `batch_id` values from `bank.staged_transactions`
+- creates one Spring Batch partition per batch
+- stores `batchId` in each partition's `ExecutionContext`
+
+The worker readers are `@StepScope` beans that pull `batchId` from the
+step execution context and query only their assigned partition.
+
+This design keeps each worker step isolated to one batch while still
+allowing parallel execution through the partitioned master step.
 
 ## Listeners
 
@@ -112,18 +124,18 @@ processing and writing happen in parallel across threads.
 | ValidateJobCompletionListener | Validate job | Updates batch_jobs with final status and counts |
 | PostJobCompletionListener | Post job | Updates batch_jobs with final status and counts |
 | ReconcileJobCompletionListener | Reconcile job | Updates batch_jobs on failure |
-| ValidationSkipListener | Validate step | Marks rejected records, logs errors to batch_job_errors |
-| ProgressListener | Load, validate, post steps | Logs read/written/skipped counts after each chunk |
+| ValidationSkipListener | Validate worker step | Marks rejected records, logs errors to batch_job_errors |
+| ProgressListener | Load, validate, post worker steps | Logs read/written/skipped counts after each chunk |
 
 ## Error handling
 
-- **Skip policy**: the validate step tolerates up to 10,000 ValidationExceptions
-  before aborting. Skipped records are marked rejected with error details.
-- **Job completion listeners**: detect failed jobs and update batch_jobs status.
-- **Restartability**: Spring Batch tracks job state in its metadata tables.
-  A failed job can be restarted with the same parameters and will resume
-  from where it stopped. The `run.id` date parameter creates unique job
-  instances for repeated test runs.
+- **Skip policy**: the validate worker step tolerates up to 10,000
+  `ValidationException` skips before aborting.
+- **Job completion listeners**: detect failed jobs and update batch_jobs
+  status.
+- **Restartability**: Spring Batch tracks job state in its metadata
+  tables. Partitioning avoids the shared-reader restart warnings seen
+  with the earlier async chunking approach.
 
 ## Control tables
 
@@ -135,5 +147,6 @@ processing and writing happen in parallel across threads.
 | staged_transactions | Holds inbound records through the pipeline (staged -> validated/rejected -> posted) |
 | batch_reconciliations | Stores reconciliation results per batch (counts, totals, match flags) |
 
-Spring Batch also maintains its own metadata tables (BATCH_JOB_INSTANCE,
-BATCH_JOB_EXECUTION, etc.) which track job state for restartability.
+Spring Batch also maintains its own metadata tables
+(`BATCH_JOB_INSTANCE`, `BATCH_JOB_EXECUTION`, and related tables)
+which track job state for restartability.
