@@ -13,3 +13,8 @@ batch-pipeline:
     - ach_20250310.csv
     - ach_20250317.csv
     - ach_20250324.csv
+  # Cron schedule for BatchScheduler. Uses Spring cron format:
+  #   second  minute  hour  day-of-month  month  day-of-week
+  # Default: nightly at 2:00 AM. Each profile can override this.
+  # Set to "-" to disable the scheduler entirely.
+  schedule: "0 0 2 * * ?"

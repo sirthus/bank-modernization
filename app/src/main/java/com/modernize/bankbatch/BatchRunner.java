@@ -1,73 +1,31 @@
 package com.modernize.bankbatch;
 
-import org.springframework.batch.core.Job;
-import org.springframework.batch.core.JobParametersBuilder;
-import org.springframework.batch.core.launch.JobLauncher;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-import java.util.Date;
-
+/**
+ * Sandbox-only entry point.
+ *
+ * In the sandbox profile the app still behaves like a classic batch job:
+ * start up, run the pipeline, exit. This mirrors how Control-M submits
+ * jobs in production — one invocation, one run.
+ *
+ * In dev/test/prod this class is not loaded. The pipeline is driven
+ * by BatchScheduler (@Scheduled) or BatchController (REST) instead.
+ */
 @Component
+@Profile("sandbox")
 public class BatchRunner implements CommandLineRunner {
 
-    private final JobLauncher jobLauncher;
-    private final Job loadTransactionsJob;
-    private final Job validateTransactionsJob;
-    private final Job postTransactionsJob;
-    private final Job reconcileJob;
-    private final BatchSummaryReport summaryReport;
-    private final BatchPipelineProperties pipelineProperties;
+    private final BatchPipelineService pipelineService;
 
-    public BatchRunner(JobLauncher jobLauncher,
-                       @Qualifier("loadTransactionsJob") Job loadTransactionsJob,
-                       @Qualifier("validateTransactionsJob") Job validateTransactionsJob,
-                       @Qualifier("postTransactionsJob") Job postTransactionsJob,
-                       @Qualifier("reconcileJob") Job reconcileJob,
-                       BatchSummaryReport summaryReport,
-                       BatchPipelineProperties pipelineProperties) {
-        this.jobLauncher = jobLauncher;
-        this.loadTransactionsJob = loadTransactionsJob;
-        this.validateTransactionsJob = validateTransactionsJob;
-        this.postTransactionsJob = postTransactionsJob;
-        this.reconcileJob = reconcileJob;
-        this.summaryReport = summaryReport;
-        this.pipelineProperties = pipelineProperties;
+    public BatchRunner(BatchPipelineService pipelineService) {
+        this.pipelineService = pipelineService;
     }
 
     @Override
     public void run(String... args) throws Exception {
-        Date runTimestamp = new Date();
-
-        // Load all inbound files from config
-        for (String fileName : pipelineProperties.getFiles()) {
-            jobLauncher.run(loadTransactionsJob,
-                new JobParametersBuilder()
-                    .addString("fileName", fileName)
-                    .addDate("run.id", runTimestamp)
-                    .toJobParameters());
-        }
-
-        // Validate all staged records
-        jobLauncher.run(validateTransactionsJob,
-            new JobParametersBuilder()
-                .addDate("run.id", runTimestamp)
-                .toJobParameters());
-
-        // Post validated records
-        jobLauncher.run(postTransactionsJob,
-            new JobParametersBuilder()
-                .addDate("run.id", runTimestamp)
-                .toJobParameters());
-
-        // Reconcile
-        jobLauncher.run(reconcileJob,
-            new JobParametersBuilder()
-                .addDate("run.id", runTimestamp)
-                .toJobParameters());
-
-        // Print summary
-        summaryReport.print();
+        pipelineService.run();
     }
 }

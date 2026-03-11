@@ -7,7 +7,8 @@ inbound transaction files.
 
 The pipeline runs four jobs in sequence: load, validate, post, reconcile.
 Each job creates a control record in `bank.batch_jobs` to track its
-execution. The `BatchRunner` class orchestrates the sequence.
+execution. `BatchPipelineService` owns the orchestration logic and is
+called by whichever trigger is active for the current profile.
 
 ## Data flow
 
@@ -40,6 +41,58 @@ execution. The `BatchRunner` class orchestrates the sequence.
     [Summary Report]
         |-- prints to console
         |-- saves to app/reports/batch_report_YYYYMMDD_HHmmss.txt
+
+## Triggering
+
+The pipeline can be triggered three ways. Which trigger is active depends
+on the Spring profile.
+
+### Sandbox (CommandLineRunner)
+
+`BatchRunner` implements `CommandLineRunner` and is loaded only in the
+`sandbox` profile. The app starts, runs the pipeline once, and exits.
+This mirrors how Control-M submits a classic batch job: one invocation,
+one run, process exits when done.
+
+    cd app && mvn spring-boot:run
+
+### Scheduled (@Scheduled)
+
+`BatchScheduler` is loaded in all non-sandbox profiles. It fires the
+pipeline on the cron expression configured in `batch-pipeline.schedule`.
+The default schedule (set in `application.yml`) is nightly at 2:00 AM.
+
+The scheduler is single-threaded. If a run takes longer than the
+schedule interval, the next fire is delayed until the current run
+finishes — the same behavior as a Control-M job fence.
+
+To test scheduling locally without editing yml files, add the `sched`
+profile, which overrides the schedule to every minute:
+
+    cd app && mvn spring-boot:run "-Dspring-boot.run.profiles=dev,sched"
+
+### REST endpoint
+
+`BatchController` exposes two endpoints, available in all non-sandbox
+profiles:
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/batch/run` | Triggers the pipeline immediately. Blocks until complete. Returns 409 if already running. |
+| GET | `/api/batch/status` | Returns `running` or `idle`. |
+
+This is the Control-M "force run" equivalent — useful for reruns,
+manual testing, and integration with other systems.
+
+    curl -X POST http://localhost:8080/api/batch/run
+    curl       http://localhost:8080/api/batch/status
+
+### Concurrent run guard
+
+`BatchPipelineService` uses an `AtomicBoolean` to prevent two triggers
+from running the pipeline simultaneously. If the scheduler fires while
+a REST-triggered run is in progress, the scheduled run is skipped and
+logged as a warning. The REST endpoint returns HTTP 409.
 
 ## Jobs and steps
 

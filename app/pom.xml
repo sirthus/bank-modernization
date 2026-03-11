@@ -41,6 +41,12 @@
             <artifactId>spring-boot-starter-batch</artifactId>
         </dependency>
 
+        <!-- Spring Web (REST endpoints + embedded Tomcat) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
         <!-- PostgreSQL driver -->
         <dependency>
             <groupId>org.postgresql</groupId>

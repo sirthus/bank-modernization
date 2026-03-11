@@ -16,6 +16,11 @@ rules, posted to a production table, and reconciled. The pipeline is
 built in Spring Batch and uses partitioned processing for validate and
 post steps.
 
+The pipeline can be triggered three ways, depending on the profile:
+- **Sandbox**: runs on startup and exits (like a classic batch job submission)
+- **Scheduled**: fires automatically on a cron expression (Control-M equivalent)
+- **REST**: triggered on demand via `POST /api/batch/run`
+
 Supporting docs:
 
 - [docs/environments.md](docs/environments.md)
@@ -55,14 +60,25 @@ Verify one environment:
 
     .\scripts\verify-env.ps1 -Database modernize_test
 
-Run the pipeline against the default sandbox profile:
+Run the pipeline (sandbox — runs on startup and exits):
 
     cd app
     mvn spring-boot:run
 
-Run against a specific profile:
+Run as a long-running server (dev — REST trigger, no auto-schedule):
 
+    cd app
     mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+    curl -X POST http://localhost:8080/api/batch/run
+    curl       http://localhost:8080/api/batch/status
+
+Run as a long-running server with per-minute scheduling (dev + sched):
+
+    cd app
+    mvn spring-boot:run "-Dspring-boot.run.profiles=dev,sched"
+
+Run against test or prod profiles:
+
     mvn spring-boot:run "-Dspring-boot.run.profiles=test"
     mvn spring-boot:run "-Dspring-boot.run.profiles=prod"
 
