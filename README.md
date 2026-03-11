@@ -102,6 +102,18 @@ Changes move through:
 
 Work is done on `dev`, verified on `test`, then promoted to `main`.
 
+## Monitoring endpoints
+
+Available when running with any non-sandbox profile (`dev`, `test`, `prod`):
+
+| Endpoint | Description |
+|---|---|
+| `GET /api/batch/status` | Returns `running` or `idle` |
+| `POST /api/batch/run` | Triggers the pipeline immediately |
+| `GET /actuator/health` | DB connectivity, disk space — used for OpenShift liveness/readiness probes |
+| `GET /actuator/metrics` | JVM, HikariCP pool, Spring Batch job/step/chunk timings |
+| `GET /actuator/metrics/spring.batch.job.launch.count` | Number of Spring Batch job launches since startup |
+
 ## Scripts
 
 - `scripts/setup-environments.ps1` - creates and builds all environments

@@ -39,6 +39,7 @@ called by whichever trigger is active for the current profile.
         |-- records results in batch_reconciliations
         v
     [Summary Report]
+        |-- scoped to the current run (filters by run start timestamp)
         |-- prints to console
         |-- saves to app/reports/batch_report_YYYYMMDD_HHmmss.txt
 
@@ -107,6 +108,12 @@ Runs once per inbound file. Accepts `fileName` as a job parameter.
 
 The load job uses `@StepScope` on the reader and setup tasklet so that
 each file gets its own instances with the correct filename parameter.
+
+`staged_transactions.account_id` carries no foreign key constraint.
+Staging is the raw intake layer — records with unknown account IDs load
+successfully and are caught by Rule 3 during the validate job. Enforcing
+referential integrity at the staging level would make those failure cases
+impossible to load and therefore impossible to test.
 
 ### Validate (validateTransactionsJob)
 
@@ -203,3 +210,16 @@ allowing parallel execution through the partitioned master step.
 Spring Batch also maintains its own metadata tables
 (`BATCH_JOB_INSTANCE`, `BATCH_JOB_EXECUTION`, and related tables)
 which track job state for restartability.
+
+## Summary report
+
+The summary report is scoped to the current pipeline run. All queries
+filter to `bank.batch_jobs` rows with `started_at >= runSince`, where
+`runSince` is the timestamp captured at the start of
+`BatchPipelineService.run()`. Totals, file summaries, rejection reasons,
+and reconciliation results all cascade from that anchor, so a database
+with history from previous runs produces a clean, accurate report for
+the run just completed.
+
+Reports are printed to the console and saved to
+`app/reports/batch_report_YYYYMMDD_HHmmss.txt` (excluded from git).
