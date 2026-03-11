@@ -11,6 +11,7 @@ import java.io.PrintWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -25,7 +26,15 @@ public class BatchSummaryReport {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public void print() {
+    /**
+     * Prints and saves a summary report scoped to the current pipeline run.
+     *
+     * All queries filter to jobs whose started_at >= runSince, which is the
+     * timestamp captured at the start of BatchPipelineService.run(). This
+     * ensures the report reflects only the current run even if the database
+     * contains history from previous runs.
+     */
+    public void print(Date runSince) {
         List<String> lines = new ArrayList<>();
 
         lines.add("========================================================");
@@ -34,11 +43,14 @@ public class BatchSummaryReport {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         lines.add("========================================================");
 
-        // Job summary
+        // Jobs from this run only
         List<Map<String, Object>> jobs = jdbcTemplate.queryForList(
             "SELECT job_name, status, record_count, " +
             "       EXTRACT(EPOCH FROM (finished_at - started_at)) AS duration_secs " +
-            "FROM bank.batch_jobs ORDER BY id");
+            "FROM bank.batch_jobs " +
+            "WHERE started_at >= ? " +
+            "ORDER BY id",
+            runSince);
 
         lines.add("");
         lines.add("  JOBS:");
@@ -52,7 +64,7 @@ public class BatchSummaryReport {
                 job.get("record_count"), duration));
         }
 
-        // Batch file summary
+        // Inbound files loaded during this run
         List<Map<String, Object>> batches = jdbcTemplate.queryForList(
             "SELECT tb.file_name, tb.record_count, " +
             "       count(CASE WHEN st.status = 'posted' THEN 1 END) AS posted, " +
@@ -61,8 +73,11 @@ public class BatchSummaryReport {
             "       count(CASE WHEN st.status = 'staged' THEN 1 END) AS still_staged " +
             "FROM bank.transaction_batches tb " +
             "LEFT JOIN bank.staged_transactions st ON st.batch_id = tb.id " +
+            "WHERE tb.batch_job_id IN " +
+            "      (SELECT id FROM bank.batch_jobs WHERE started_at >= ?) " +
             "GROUP BY tb.id, tb.file_name, tb.record_count " +
-            "ORDER BY tb.id");
+            "ORDER BY tb.id",
+            runSince);
 
         lines.add("");
         lines.add("  INBOUND FILES:");
@@ -72,14 +87,19 @@ public class BatchSummaryReport {
                 b.get("posted"), b.get("rejected")));
         }
 
-        // Overall totals
+        // Totals scoped to staged records from this run's batches
         Map<String, Object> totals = jdbcTemplate.queryForMap(
             "SELECT count(*) AS total, " +
             "       count(CASE WHEN status = 'posted' THEN 1 END) AS posted, " +
             "       count(CASE WHEN status = 'validated' THEN 1 END) AS validated, " +
             "       count(CASE WHEN status = 'rejected' THEN 1 END) AS rejected, " +
             "       count(CASE WHEN status = 'staged' THEN 1 END) AS still_staged " +
-            "FROM bank.staged_transactions");
+            "FROM bank.staged_transactions " +
+            "WHERE batch_id IN ( " +
+            "      SELECT tb.id FROM bank.transaction_batches tb " +
+            "      JOIN bank.batch_jobs bj ON tb.batch_job_id = bj.id " +
+            "      WHERE bj.started_at >= ?)",
+            runSince);
 
         lines.add("");
         lines.add("  TOTALS:");
@@ -88,12 +108,15 @@ public class BatchSummaryReport {
         lines.add("    Rejected:          " + totals.get("rejected"));
         lines.add("    Still staged:      " + totals.get("still_staged"));
 
-        // Error breakdown
+        // Errors logged during this run's validate job
         List<Map<String, Object>> errors = jdbcTemplate.queryForList(
             "SELECT error_message, count(*) AS cnt " +
             "FROM bank.batch_job_errors " +
+            "WHERE batch_job_id IN " +
+            "      (SELECT id FROM bank.batch_jobs WHERE started_at >= ?) " +
             "GROUP BY error_message " +
-            "ORDER BY cnt DESC");
+            "ORDER BY cnt DESC",
+            runSince);
 
         lines.add("");
         lines.add("  REJECTION REASONS:");
@@ -105,14 +128,17 @@ public class BatchSummaryReport {
             }
         }
 
-        // Reconciliation
+        // Reconciliation results from this run
         List<Map<String, Object>> recon = jdbcTemplate.queryForList(
             "SELECT br.batch_id, tb.file_name, " +
             "       br.staged_count, br.posted_count, " +
             "       br.counts_match, br.totals_match " +
             "FROM bank.batch_reconciliations br " +
             "JOIN bank.transaction_batches tb ON tb.id = br.batch_id " +
-            "ORDER BY br.id");
+            "WHERE br.batch_job_id IN " +
+            "      (SELECT id FROM bank.batch_jobs WHERE started_at >= ?) " +
+            "ORDER BY br.id",
+            runSince);
 
         lines.add("");
         lines.add("  RECONCILIATION:");

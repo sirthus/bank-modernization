@@ -98,7 +98,7 @@ public class BatchPipelineService {
                     .addDate("run.id", runTimestamp)
                     .toJobParameters());
 
-            summaryReport.print();
+            summaryReport.print(runTimestamp);
 
             log.info("Pipeline complete");
 
