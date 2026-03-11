@@ -114,6 +114,27 @@ Available when running with any non-sandbox profile (`dev`, `test`, `prod`):
 | `GET /actuator/metrics` | JVM, HikariCP pool, Spring Batch job/step/chunk timings |
 | `GET /actuator/metrics/spring.batch.job.launch.count` | Number of Spring Batch job launches since startup |
 
+## Testing
+
+Run the full test suite:
+
+    cd app && mvn test
+
+### Test inventory
+
+| Test class | Type | What it covers |
+|---|---|---|
+| `ValidationProcessorTest` | Unit | All four validation rules, boundary values, multi-rule accumulation, exception traceability |
+
+### Test types in use
+
+**Unit tests** (`ValidationProcessorTest`) instantiate the class under test
+directly with `new` — no Spring context, no database. They run in under a
+second and are the first line of defence for logic defects.
+
+Integration tests (Testcontainers + `@SpringBatchTest`) are added in
+subsequent phases.
+
 ## Scripts
 
 - `scripts/setup-environments.ps1` - creates and builds all environments
