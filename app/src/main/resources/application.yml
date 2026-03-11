@@ -8,6 +8,15 @@ spring:
     job:
       enabled: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,batch
+  endpoint:
+    health:
+      show-details: always
+
 batch-pipeline:
   files:
     - ach_20250310.csv

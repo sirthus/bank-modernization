@@ -47,6 +47,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Spring Actuator (health, metrics — required for OpenShift liveness/readiness probes) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- PostgreSQL driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
