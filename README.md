@@ -120,11 +120,17 @@ Run the full test suite:
 
     cd app && mvn test
 
+Integration tests connect to `modernize_buildtest` via the `batchtest`
+profile. The database must be running before `mvn test` is executed.
+
 ### Test inventory
 
 | Test class | Type | What it covers |
 |---|---|---|
 | `ValidationProcessorTest` | Unit | All four validation rules, boundary values, multi-rule accumulation, exception traceability |
+| `LoadTransactionsJobTest` | Integration | Load job stages all records regardless of validity; record counts per file; all records arrive with `staged` status |
+| `ValidateTransactionsJobTest` | Integration | All-valid happy path; invalid amounts; unknown account; inactive account; mixed batch counts and error messages |
+| `PostTransactionsJobTest` | Integration | Validated records posted and marked `posted`; rejected records untouched; column value correctness; empty database edge case |
 
 ### Test types in use
 
@@ -132,8 +138,11 @@ Run the full test suite:
 directly with `new` — no Spring context, no database. They run in under a
 second and are the first line of defence for logic defects.
 
-Integration tests (Testcontainers + `@SpringBatchTest`) are added in
-subsequent phases.
+**Integration tests** (`LoadTransactionsJobTest`, `ValidateTransactionsJobTest`,
+`PostTransactionsJobTest`) use `@SpringBatchTest` + `@SpringBootTest` with
+`@ActiveProfiles("batchtest")`. They load the full application context and run
+against `modernize_buildtest`. Each test class uses `@BeforeEach` to clear
+staged data so tests are independent.
 
 ## Scripts
 

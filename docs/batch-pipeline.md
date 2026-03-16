@@ -211,6 +211,45 @@ Spring Batch also maintains its own metadata tables
 (`BATCH_JOB_INSTANCE`, `BATCH_JOB_EXECUTION`, and related tables)
 which track job state for restartability.
 
+## Test CSV files
+
+Six test CSV files live in `app/src/main/resources/` alongside the
+production ACH files. They are used during development and integration
+testing to exercise specific validation scenarios without relying on
+the full production data set.
+
+| File | Scenario |
+|---|---|
+| `test_all_valid.csv` | Three records that pass all validation rules |
+| `test_invalid_amounts.csv` | Two zero/negative amounts (Rule 1) + one valid |
+| `test_invalid_directions.csv` | Three invalid direction values (Rule 2) |
+| `test_unknown_account.csv` | One record with account 9999, which does not exist (Rule 3) |
+| `test_inactive_account.csv` | One record with account 2004, which is frozen (Rule 4) |
+| `test_mixed.csv` | Five records covering valid, zero amount, unknown account, and invalid direction |
+
+### Switching between ACH and test files
+
+`application.yml` controls which files the pipeline processes. Comment
+out the set you do not want to run:
+
+    batch-pipeline:
+      files:
+        # ACH files (production data)
+        #- ach_20250310.csv
+        #- ach_20250317.csv
+        #- ach_20250324.csv
+        # Test files (comment out ACH above, uncomment these)
+        - test_all_valid.csv
+        - test_invalid_amounts.csv
+        - test_invalid_directions.csv
+        - test_unknown_account.csv
+        - test_inactive_account.csv
+        - test_mixed.csv
+
+Integration tests do not use this list — they call the load job directly
+with a specific `fileName` parameter via `JobParametersBuilder`, so
+`application.yml` does not affect them.
+
 ## Summary report
 
 The summary report is scoped to the current pipeline run. All queries

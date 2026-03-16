@@ -22,9 +22,12 @@ foreach ($file in $files) {
     docker exec pg18 psql -q -U postgres -d $Database -f "/tmp/$file"
 }
 
-# Seed data - prod gets the large dataset, everything else gets standard
+# Seed data - prod gets the prod dataset, buildtest gets the small controlled
+# dataset, everything else gets the standard large dataset
 if ($Database -eq "modernize_prod") {
     $seedFile = "012_seed_data_prod.sql"
+} elseif ($Database -eq "modernize_buildtest") {
+    $seedFile = "012b_seed_small_data.sql"
 } else {
     $seedFile = "012_seed_data.sql"
 }

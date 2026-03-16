@@ -19,9 +19,16 @@ management:
 
 batch-pipeline:
   files:
-    - ach_20250310.csv
-    - ach_20250317.csv
-    - ach_20250324.csv
+  # select ACH or test (comment out the other)
+    #- ach_20250310.csv
+    #- ach_20250317.csv
+    #- ach_20250324.csv
+    - test_all_valid.csv
+    - test_invalid_amounts.csv
+    - test_invalid_directions.csv
+    - test_unknown_account.csv
+    - test_inactive_account.csv
+    - test_mixed.csv
   # Cron schedule for BatchScheduler. Uses Spring cron format:
   #   second  minute  hour  day-of-month  month  day-of-week
   # Default: nightly at 2:00 AM. Each profile can override this.
