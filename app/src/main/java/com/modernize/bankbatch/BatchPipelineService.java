@@ -2,6 +2,7 @@ package com.modernize.bankbatch;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
@@ -72,9 +73,11 @@ public class BatchPipelineService {
 
         try {
             Date runTimestamp = new Date();
+            MDC.put("pipeline.runId", String.valueOf(runTimestamp.getTime()));
 
             log.info("Pipeline starting");
 
+            MDC.put("job.name", "loadTransactionsJob");
             for (String fileName : pipelineProperties.getFiles()) {
                 jobLauncher.run(loadTransactionsJob,
                     new JobParametersBuilder()
@@ -83,26 +86,31 @@ public class BatchPipelineService {
                         .toJobParameters());
             }
 
+            MDC.put("job.name", "validateTransactionsJob");
             jobLauncher.run(validateTransactionsJob,
                 new JobParametersBuilder()
                     .addDate("run.id", runTimestamp)
                     .toJobParameters());
 
+            MDC.put("job.name", "postTransactionsJob");
             jobLauncher.run(postTransactionsJob,
                 new JobParametersBuilder()
                     .addDate("run.id", runTimestamp)
                     .toJobParameters());
 
+            MDC.put("job.name", "reconcileJob");
             jobLauncher.run(reconcileJob,
                 new JobParametersBuilder()
                     .addDate("run.id", runTimestamp)
                     .toJobParameters());
 
+            MDC.remove("job.name");
             summaryReport.print(runTimestamp);
 
             log.info("Pipeline complete");
 
         } finally {
+            MDC.clear();
             running.set(false);
         }
     }

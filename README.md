@@ -29,7 +29,7 @@ Supporting docs:
 ## Prerequisites
 
 - Docker Desktop with WSL2
-- Java JDK 17+ (tested with JDK 25)
+- Java 21+ (tested with JDK 25)
 - Apache Maven 3.9+
 - PowerShell
 
@@ -64,6 +64,9 @@ Run the pipeline (sandbox — runs on startup and exits):
 
     cd app
     mvn spring-boot:run
+
+Pipeline reports are saved to `app/reports/batch_report_YYYYMMDD_HHmmss.txt`
+(directory is created on first run; excluded from git).
 
 Run as a long-running server (dev — REST trigger, no auto-schedule):
 
@@ -110,9 +113,19 @@ Available when running with any non-sandbox profile (`dev`, `test`, `prod`):
 |---|---|
 | `GET /api/batch/status` | Returns `running` or `idle` |
 | `POST /api/batch/run` | Triggers the pipeline immediately |
-| `GET /actuator/health` | DB connectivity, disk space — used for OpenShift liveness/readiness probes |
-| `GET /actuator/metrics` | JVM, HikariCP pool, Spring Batch job/step/chunk timings |
-| `GET /actuator/metrics/spring.batch.job.launch.count` | Number of Spring Batch job launches since startup |
+| `GET /actuator/health` | Full health — all contributors |
+| `GET /actuator/health/liveness` | Liveness group — JVM process health (used by OpenShift liveness probe) |
+| `GET /actuator/health/readiness` | Readiness group — application ready + database reachable (used by OpenShift readiness probe) |
+| `GET /actuator/metrics` | List of all metric names |
+| `GET /actuator/prometheus` | Prometheus scrape endpoint — all metrics in exposition format |
+
+## Logging
+
+In `sandbox` and `batchtest` profiles, logs are plain text. In `dev`, `test`, and `prod`, logs
+are structured JSON (Logstash format) suitable for ingestion by Splunk, ELK, or Datadog.
+
+Each pipeline run sets `pipeline.runId` and `job.name` as MDC fields, so every log line
+emitted during a run can be filtered by run or by job in a log aggregator.
 
 ## Testing
 

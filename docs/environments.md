@@ -67,6 +67,7 @@ Profile-specific configuration files are in `app/src/main/resources/`.
 | `dev` | `modernize_dev` | `application-dev.yml` | Active development |
 | `test` | `modernize_test` | `application-test.yml` | Verification after promotion to `test` |
 | `prod` | `modernize_prod` | `application-prod.yml` | Production-style release simulation |
+| `sched` | (inherits from primary) | `application-sched.yml` | Overrides schedule to every minute for local scheduler testing; compose with `dev,sched` |
 | `batchtest` | `modernize_buildtest` | `application-batchtest.yml` (test/resources) | Integration tests only — loaded by `@ActiveProfiles("batchtest")` |
 
 The `batchtest` profile is defined in `app/src/test/resources/` and is
@@ -137,6 +138,7 @@ These files are applied in sequence by the environment build scripts:
     010_create_staged_transactions.sql
     011_create_batch_reconciliations.sql
     012_seed_data.sql
+    013_drop_staged_account_fk.sql
 
 Seed data variants:
 
@@ -147,6 +149,12 @@ Seed data variants:
 | `012b_seed_small_data.sql` | `modernize_buildtest` (integration test accounts and merchants only) |
 
 The routing is handled by `scripts/build-schema.ps1`.
+
+`013_drop_staged_account_fk.sql` removes the foreign key constraint on
+`staged_transactions.account_id`. This is intentional: staging is the raw intake
+layer, so records with unknown account IDs must be able to load successfully and
+be caught later by Rule 3 of the validate job. Without this, those failure cases
+would be impossible to load and test.
 
 ## Docker Compose
 

@@ -63,6 +63,12 @@ one run, process exits when done.
 pipeline on the cron expression configured in `batch-pipeline.schedule`.
 The default schedule (set in `application.yml`) is nightly at 2:00 AM.
 
+The schedule uses Spring's 6-field cron format (second, minute, hour,
+day-of-month, month, day-of-week) — not the standard 5-field Unix cron.
+For example, `"0 0 2 * * ?"` means: at second 0, minute 0, hour 2, every
+day. The `sched` profile overrides this to `"0 * * * * ?"` (every minute)
+for local testing.
+
 The scheduler is single-threaded. If a run takes longer than the
 schedule interval, the next fire is delayed until the current run
 finishes — the same behavior as a Control-M job fence.
@@ -104,7 +110,11 @@ Runs once per inbound file. Accepts `fileName` as a job parameter.
 | Step | Type | What it does |
 |---|---|---|
 | setupStep | Tasklet | Creates batch_jobs and transaction_batches rows, stores IDs in ExecutionContext |
-| loadStep | Chunk (500) | FlatFileItemReader -> processor sets batchId -> JdbcBatchItemWriter into staged_transactions |
+| loadStep | Chunk (500) | FlatFileItemReader → processor sets batchId → JdbcBatchItemWriter into staged_transactions |
+
+All chunk-oriented steps (load, validate, post) use a chunk size of 500 items.
+Each chunk is wrapped in a transaction, so a failure rolls back only the current
+chunk, not the entire job.
 
 The load job uses `@StepScope` on the reader and setup tasklet so that
 each file gets its own instances with the correct filename parameter.
@@ -186,6 +196,55 @@ allowing parallel execution through the partitioned master step.
 | ReconcileJobCompletionListener | Reconcile job | Updates batch_jobs on failure |
 | ValidationSkipListener | Validate worker step | Marks rejected records, logs errors to batch_job_errors |
 | ProgressListener | Load, validate, post worker steps | Logs read/written/skipped counts after each chunk |
+
+## Observability
+
+### Health endpoints
+
+The following health endpoints are available in non-sandbox profiles:
+
+| Endpoint | Group members | Purpose |
+|---|---|---|
+| `/actuator/health` | All contributors | Full view — DB, disk, liveness, readiness |
+| `/actuator/health/liveness` | `livenessState` | Is the JVM process alive? Used for OpenShift liveness probe |
+| `/actuator/health/readiness` | `readinessState`, `db` | Is the app ready and the database reachable? Used for OpenShift readiness probe |
+
+### Prometheus metrics
+
+`/actuator/prometheus` exposes all metrics in Prometheus exposition format.
+A Prometheus server scrapes this endpoint on a schedule; Grafana queries
+Prometheus to render dashboards and fire alerts.
+
+Key Spring Batch metrics available after a pipeline run:
+
+| Metric | What it measures |
+|---|---|
+| `spring_batch_job_seconds` | Duration per job, labelled by job name and status |
+| `spring_batch_step_seconds` | Duration per step, labelled by job, step name, and status |
+| `spring_batch_item_process_seconds` | Item processing time, labelled by status (`SUCCESS` / `FAILURE`) |
+| `spring_batch_job_launch_count_total` | Total job launches since startup |
+
+### Structured logging
+
+Log output format depends on the active profile:
+
+| Profile | Format |
+|---|---|
+| `sandbox`, `batchtest` | Plain text (readable in local console and test output) |
+| `dev`, `test`, `prod` | JSON (Logstash format — suitable for Splunk, ELK, Datadog) |
+
+`BatchPipelineService` sets two MDC fields at the start of each pipeline run:
+
+| Field | Value | Scope |
+|---|---|---|
+| `pipeline.runId` | Epoch millis of the run start timestamp | Entire pipeline run |
+| `job.name` | Name of the current job being launched | Per-job |
+
+Because MDC is thread-local and all jobs run synchronously on the same thread,
+these fields appear on every log line — including framework-level Spring Batch
+logs — for the duration of the run. In a log aggregator, filtering by
+`pipeline.runId` returns the complete trace of a single pipeline run across
+all classes.
 
 ## Error handling
 
