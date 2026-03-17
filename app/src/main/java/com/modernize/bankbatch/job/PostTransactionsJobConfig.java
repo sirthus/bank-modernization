@@ -63,13 +63,14 @@ public class PostTransactionsJobConfig {
         return new JdbcCursorItemReaderBuilder<StagedTransaction>()
                 .name("partitionedValidatedReader")
                 .dataSource(dataSource)
-                .sql("SELECT id, account_id, merchant_id, direction, amount_cents, txn_date " +
+                .sql("SELECT id, batch_id, account_id, merchant_id, direction, amount_cents, txn_date " +
                      "FROM bank.staged_transactions " +
                      "WHERE status = 'validated' AND batch_id = ?")
                 .queryArguments(batchId)
                 .rowMapper((rs, rowNum) -> {
                     StagedTransaction item = new StagedTransaction();
                     item.setId(rs.getInt("id"));
+                    item.setBatchId(rs.getInt("batch_id"));
                     item.setAccountId(rs.getInt("account_id"));
                     int merchantId = rs.getInt("merchant_id");
                     item.setMerchantId(rs.wasNull() ? null : merchantId);

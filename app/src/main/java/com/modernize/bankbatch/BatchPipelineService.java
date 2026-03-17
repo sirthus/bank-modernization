@@ -82,30 +82,30 @@ public class BatchPipelineService {
                 jobLauncher.run(loadTransactionsJob,
                     new JobParametersBuilder()
                         .addString("fileName", fileName)
-                        .addDate("run.id", runTimestamp)
+                        .addLong("run.id", runTimestamp.getTime())
                         .toJobParameters());
             }
 
             MDC.put("job.name", "validateTransactionsJob");
             jobLauncher.run(validateTransactionsJob,
                 new JobParametersBuilder()
-                    .addDate("run.id", runTimestamp)
+                    .addLong("run.id", runTimestamp.getTime())
                     .toJobParameters());
 
             MDC.put("job.name", "postTransactionsJob");
             jobLauncher.run(postTransactionsJob,
                 new JobParametersBuilder()
-                    .addDate("run.id", runTimestamp)
+                    .addLong("run.id", runTimestamp.getTime())
                     .toJobParameters());
 
             MDC.put("job.name", "reconcileJob");
             jobLauncher.run(reconcileJob,
                 new JobParametersBuilder()
-                    .addDate("run.id", runTimestamp)
+                    .addLong("run.id", runTimestamp.getTime())
                     .toJobParameters());
 
             MDC.remove("job.name");
-            summaryReport.print(runTimestamp);
+            summaryReport.print();
 
             log.info("Pipeline complete");
 

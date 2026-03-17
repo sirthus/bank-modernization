@@ -59,6 +59,8 @@ class ValidateTransactionsJobTest {
 
         // Delete in FK-safe order: children before parents.
         jdbcTemplate.update("DELETE FROM bank.batch_job_errors");
+        jdbcTemplate.update("DELETE FROM bank.batch_reconciliations");
+        jdbcTemplate.update("DELETE FROM bank.transactions");
         jdbcTemplate.update("DELETE FROM bank.staged_transactions");
         jdbcTemplate.update("DELETE FROM bank.transaction_batches");
         jdbcTemplate.update("DELETE FROM bank.batch_jobs");

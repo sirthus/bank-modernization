@@ -20,12 +20,13 @@ public class PostingWriter implements ItemWriter<StagedTransaction> {
             // Insert into production transactions table
             jdbcTemplate.update(
                 "INSERT INTO bank.transactions " +
-                "(account_id, merchant_id, direction, amount_cents, status, description) " +
-                "VALUES (?, ?, ?, ?, 'posted', 'Batch posted')",
+                "(account_id, merchant_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (?, ?, ?, ?, 'posted', 'Batch posted', ?)",
                 item.getAccountId(),
                 item.getMerchantId(),
                 item.getDirection(),
-                item.getAmountCents());
+                item.getAmountCents(),
+                item.getBatchId());
 
             // Update staged record to posted
             jdbcTemplate.update(

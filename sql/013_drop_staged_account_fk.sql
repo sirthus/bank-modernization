@@ -15,4 +15,4 @@
 --   psql -U postgres -d modernize_prod      -f sql/013_drop_staged_account_fk.sql
 
 ALTER TABLE bank.staged_transactions
-    DROP CONSTRAINT staged_transactions_account_id_fkey;
+    DROP CONSTRAINT IF EXISTS staged_transactions_account_id_fkey;

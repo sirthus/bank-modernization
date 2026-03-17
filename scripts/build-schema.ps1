@@ -14,7 +14,9 @@ $files = @(
     "008_create_transaction_batches.sql",
     "009_create_batch_job_errors.sql",
     "010_create_staged_transactions.sql",
-    "011_create_batch_reconciliations.sql"
+    "011_create_batch_reconciliations.sql",
+    "013_drop_staged_account_fk.sql",
+    "014_add_batch_id_to_transactions.sql"
 )
 
 foreach ($file in $files) {

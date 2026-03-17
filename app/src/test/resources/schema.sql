@@ -1,5 +1,5 @@
 -- Combined schema for Testcontainers integration tests.
--- Mirrors sql/001 through sql/011 in the correct dependency order.
+-- Mirrors sql/001 through sql/014 in the correct dependency order.
 -- 013_drop_staged_account_fk.sql is not needed: 010 already defines
 -- account_id without a FK constraint.
 
@@ -110,3 +110,7 @@ CREATE TABLE bank.batch_reconciliations (
     totals_match        BOOLEAN         NOT NULL,
     created_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
+
+-- 014
+ALTER TABLE bank.transactions
+    ADD COLUMN batch_id INTEGER REFERENCES bank.transaction_batches(id);

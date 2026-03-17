@@ -7,6 +7,7 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.JobParameters;
 import org.springframework.batch.core.JobParametersBuilder;
+import org.springframework.batch.test.MetaDataInstanceFactory;
 import org.springframework.batch.test.JobLauncherTestUtils;
 import org.springframework.batch.test.JobRepositoryTestUtils;
 import org.springframework.batch.test.context.SpringBatchTest;
@@ -62,6 +63,7 @@ class PostTransactionsJobTest {
 
         // Delete in FK-safe order: children before parents.
         jdbcTemplate.update("DELETE FROM bank.batch_job_errors");
+        jdbcTemplate.update("DELETE FROM bank.batch_reconciliations");
         jdbcTemplate.update("DELETE FROM bank.transactions");
         jdbcTemplate.update("DELETE FROM bank.staged_transactions");
         jdbcTemplate.update("DELETE FROM bank.transaction_batches");
@@ -96,7 +98,12 @@ class PostTransactionsJobTest {
                 batchId, accountId, direction, amountCents);
     }
 
-    private JobExecution runPostJob() throws Exception {
+    JobExecution getJobExecution() {
+        jobLauncherTestUtils.setJob(postTransactionsJob);
+        return MetaDataInstanceFactory.createJobExecution();
+    }
+
+    private JobExecution launchPostJob() throws Exception {
         JobParameters params = new JobParametersBuilder()
                 .addLong("run.id", System.currentTimeMillis())
                 .toJobParameters();
@@ -114,7 +121,7 @@ class PostTransactionsJobTest {
         stageValidated(batchId, 2002, "C", 1500);
         stageValidated(batchId, 2003, "C", 25000);
 
-        JobExecution execution = runPostJob();
+        JobExecution execution = launchPostJob();
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
@@ -147,7 +154,7 @@ class PostTransactionsJobTest {
                 "VALUES (?, 2002, 'D', 0, '2025-03-10', 'rejected')",
                 batchId);
 
-        runPostJob();
+        launchPostJob();
 
         // Only the 2 validated records become transactions.
         int txnCount = jdbcTemplate.queryForObject(
@@ -170,14 +177,15 @@ class PostTransactionsJobTest {
         int batchId = insertBatch();
         stageValidated(batchId, 2001, "D", 7500);
 
-        runPostJob();
+        launchPostJob();
 
         // Verify the actual values written to bank.transactions.
         Map<String, Object> txn = jdbcTemplate.queryForMap(
-                "SELECT account_id, direction, amount_cents, status, description " +
+                "SELECT account_id, batch_id, direction, amount_cents, status, description " +
                 "FROM bank.transactions");
 
         assertThat(txn.get("account_id")).isEqualTo(2001);
+        assertThat(txn.get("batch_id")).isEqualTo(batchId);
         assertThat(txn.get("direction").toString().trim()).isEqualTo("D");
         assertThat(txn.get("amount_cents")).isEqualTo(7500);
         assertThat(txn.get("status")).isEqualTo("posted");
@@ -191,7 +199,7 @@ class PostTransactionsJobTest {
     @Test
     void postJob_noValidatedRecords_completesWithNoTransactions() throws Exception {
         // No staged records at all — partitioner finds no batch_ids.
-        JobExecution execution = runPostJob();
+        JobExecution execution = launchPostJob();
 
         assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
 
