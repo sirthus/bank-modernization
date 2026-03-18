@@ -3,3 +3,11 @@ spring:
     url: jdbc:postgresql://localhost:5432/modernize_buildtest
     username: postgres
     password: postgres
+  main:
+    web-application-type: none
+
+# Sandbox runs via CommandLineRunner (BatchRunner), not the scheduler.
+# BatchScheduler is excluded by @Profile("!sandbox") so this value
+# is never actually read, but it is set here for clarity.
+batch-pipeline:
+  schedule: "-"

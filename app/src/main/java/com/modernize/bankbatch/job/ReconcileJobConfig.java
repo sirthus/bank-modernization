@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
+import java.sql.Timestamp;
 import java.util.List;
 import java.util.Map;
 
@@ -22,6 +23,10 @@ public class ReconcileJobConfig {
     @Bean
     public Tasklet reconcileTasklet(JdbcTemplate jdbcTemplate) {
         return (contribution, chunkContext) -> {
+            Long runId = ((Number) chunkContext.getStepContext()
+                .getJobParameters()
+                .get("run.id")).longValue();
+            Timestamp runSince = new Timestamp(runId);
 
             // Create the reconciliation job row
             Integer jobId = jdbcTemplate.queryForObject(
@@ -29,10 +34,18 @@ public class ReconcileJobConfig {
                 "VALUES ('reconcile_batches', 'running') RETURNING id",
                 Integer.class);
 
-            // Find all batches that have posted records
+            // Reconcile only batches loaded in the current pipeline run.
             List<Map<String, Object>> batches = jdbcTemplate.queryForList(
-                "SELECT DISTINCT batch_id FROM bank.staged_transactions " +
-                "WHERE status = 'posted'");
+                "SELECT tb.id AS batch_id " +
+                "FROM bank.transaction_batches tb " +
+                "JOIN bank.batch_jobs bj ON bj.id = tb.batch_job_id " +
+                "WHERE bj.job_name = 'load_transactions' " +
+                "  AND bj.started_at >= ? " +
+                "  AND EXISTS ( " +
+                "      SELECT 1 FROM bank.staged_transactions st " +
+                "      WHERE st.batch_id = tb.id AND st.status = 'posted') " +
+                "ORDER BY tb.id",
+                runSince);
 
             for (Map<String, Object> row : batches) {
                 Integer batchId = (Integer) row.get("batch_id");
@@ -44,17 +57,11 @@ public class ReconcileJobConfig {
                     "WHERE batch_id = ? AND status = 'posted'",
                     batchId);
 
-                // Count and sum from production by matching on key fields
+                // Count and sum from production scoped to this batch_id
                 Map<String, Object> posted = jdbcTemplate.queryForMap(
-                    "SELECT count(*) AS cnt, coalesce(sum(t.amount_cents), 0) AS total " +
-                    "FROM bank.staged_transactions st " +
-                    "JOIN bank.transactions t " +
-                    "  ON t.account_id = st.account_id " +
-                    " AND t.amount_cents = st.amount_cents " +
-                    " AND t.direction = st.direction " +
-                    " AND coalesce(t.merchant_id, -1) = coalesce(st.merchant_id, -1) " +
-                    " AND t.description = 'Batch posted' " +
-                    "WHERE st.batch_id = ? AND st.status = 'posted'",
+                    "SELECT count(*) AS cnt, coalesce(sum(amount_cents), 0) AS total " +
+                    "FROM bank.transactions " +
+                    "WHERE batch_id = ?",
                     batchId);
 
                 long stagedCount = (Long) staged.get("cnt");

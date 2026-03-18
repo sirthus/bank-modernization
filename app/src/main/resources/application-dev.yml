@@ -3,3 +3,10 @@ spring:
     url: jdbc:postgresql://localhost:5432/modernize_dev
     username: postgres
     password: postgres
+
+# Schedule inherits the default from application.yml (nightly 2am).
+# To test scheduling locally, change application.yml schedule to:
+#   schedule: "0 * * * * ?"   (every minute)
+# To disable the scheduler in dev, add:
+#   batch-pipeline:
+#     schedule: "-"

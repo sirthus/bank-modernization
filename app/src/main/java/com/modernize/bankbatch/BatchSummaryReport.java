@@ -25,6 +25,10 @@ public class BatchSummaryReport {
         this.jdbcTemplate = jdbcTemplate;
     }
 
+    /**
+     * Prints and saves a cumulative summary report covering all pipeline runs
+     * recorded in the database.
+     */
     public void print() {
         List<String> lines = new ArrayList<>();
 
@@ -34,11 +38,16 @@ public class BatchSummaryReport {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         lines.add("========================================================");
 
-        // Job summary
+        // Cumulative totals per job type across all runs
         List<Map<String, Object>> jobs = jdbcTemplate.queryForList(
-            "SELECT job_name, status, record_count, " +
-            "       EXTRACT(EPOCH FROM (finished_at - started_at)) AS duration_secs " +
-            "FROM bank.batch_jobs ORDER BY id");
+            "SELECT job_name, " +
+            "       'completed' AS status, " +
+            "       SUM(record_count) AS record_count, " +
+            "       SUM(EXTRACT(EPOCH FROM (finished_at - started_at))) AS duration_secs " +
+            "FROM bank.batch_jobs " +
+            "WHERE status = 'completed' " +
+            "GROUP BY job_name " +
+            "ORDER BY MIN(id)");
 
         lines.add("");
         lines.add("  JOBS:");
@@ -52,7 +61,7 @@ public class BatchSummaryReport {
                 job.get("record_count"), duration));
         }
 
-        // Batch file summary
+        // All inbound files across all runs
         List<Map<String, Object>> batches = jdbcTemplate.queryForList(
             "SELECT tb.file_name, tb.record_count, " +
             "       count(CASE WHEN st.status = 'posted' THEN 1 END) AS posted, " +
@@ -72,7 +81,7 @@ public class BatchSummaryReport {
                 b.get("posted"), b.get("rejected")));
         }
 
-        // Overall totals
+        // Totals across all runs
         Map<String, Object> totals = jdbcTemplate.queryForMap(
             "SELECT count(*) AS total, " +
             "       count(CASE WHEN status = 'posted' THEN 1 END) AS posted, " +
@@ -88,7 +97,7 @@ public class BatchSummaryReport {
         lines.add("    Rejected:          " + totals.get("rejected"));
         lines.add("    Still staged:      " + totals.get("still_staged"));
 
-        // Error breakdown
+        // Errors across all runs
         List<Map<String, Object>> errors = jdbcTemplate.queryForList(
             "SELECT error_message, count(*) AS cnt " +
             "FROM bank.batch_job_errors " +
@@ -105,7 +114,7 @@ public class BatchSummaryReport {
             }
         }
 
-        // Reconciliation
+        // Reconciliation results across all runs
         List<Map<String, Object>> recon = jdbcTemplate.queryForList(
             "SELECT br.batch_id, tb.file_name, " +
             "       br.staged_count, br.posted_count, " +
@@ -116,12 +125,16 @@ public class BatchSummaryReport {
 
         lines.add("");
         lines.add("  RECONCILIATION:");
-        for (Map<String, Object> r : recon) {
-            String match = (Boolean) r.get("counts_match") && (Boolean) r.get("totals_match")
-                ? "PASS" : "FAIL";
-            lines.add(String.format("    %-24s  staged: %s, posted: %s, result: %s",
-                r.get("file_name"), r.get("staged_count"),
-                r.get("posted_count"), match));
+        if (recon.isEmpty()) {
+            lines.add("    (none)");
+        } else {
+            for (Map<String, Object> r : recon) {
+                String match = (Boolean) r.get("counts_match") && (Boolean) r.get("totals_match")
+                    ? "PASS" : "FAIL";
+                lines.add(String.format("    %-24s  staged: %s, posted: %s, result: %s",
+                    r.get("file_name"), r.get("staged_count"),
+                    r.get("posted_count"), match));
+            }
         }
 
         lines.add("");

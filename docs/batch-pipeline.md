@@ -7,7 +7,8 @@ inbound transaction files.
 
 The pipeline runs four jobs in sequence: load, validate, post, reconcile.
 Each job creates a control record in `bank.batch_jobs` to track its
-execution. The `BatchRunner` class orchestrates the sequence.
+execution. `BatchPipelineService` owns the orchestration logic and is
+called by whichever trigger is active for the current profile.
 
 ## Data flow
 
@@ -38,8 +39,67 @@ execution. The `BatchRunner` class orchestrates the sequence.
         |-- records results in batch_reconciliations
         v
     [Summary Report]
+        |-- cumulative across all runs (grouped totals per job type)
         |-- prints to console
         |-- saves to app/reports/batch_report_YYYYMMDD_HHmmss.txt
+
+## Triggering
+
+The pipeline can be triggered three ways. Which trigger is active depends
+on the Spring profile.
+
+### Sandbox (CommandLineRunner)
+
+`BatchRunner` implements `CommandLineRunner` and is loaded only in the
+`sandbox` profile. The app starts, runs the pipeline once, and exits.
+This mirrors how Control-M submits a classic batch job: one invocation,
+one run, process exits when done.
+
+    cd app && mvn spring-boot:run
+
+### Scheduled (@Scheduled)
+
+`BatchScheduler` is loaded in all non-sandbox profiles. It fires the
+pipeline on the cron expression configured in `batch-pipeline.schedule`.
+The default schedule (set in `application.yml`) is nightly at 2:00 AM.
+
+The schedule uses Spring's 6-field cron format (second, minute, hour,
+day-of-month, month, day-of-week) — not the standard 5-field Unix cron.
+For example, `"0 0 2 * * ?"` means: at second 0, minute 0, hour 2, every
+day. The `sched` profile overrides this to `"0 * * * * ?"` (every minute)
+for local testing.
+
+The scheduler is single-threaded. If a run takes longer than the
+schedule interval, the next fire is delayed until the current run
+finishes — the same behavior as a Control-M job fence.
+
+To test scheduling locally without editing yml files, add the `sched`
+profile, which overrides the schedule to every minute:
+
+    cd app && mvn spring-boot:run "-Dspring-boot.run.profiles=dev,sched"
+
+### REST endpoint
+
+`BatchController` exposes two endpoints, available in all non-sandbox
+profiles:
+
+| Method | Path | Description |
+|---|---|---|
+| POST | `/api/batch/run` | Triggers the pipeline immediately. Blocks until complete. Returns 409 if already running. |
+| GET | `/api/batch/status` | Returns `running` or `idle`. |
+
+This is the Control-M "force run" equivalent — useful for reruns,
+manual testing, and integration with other systems.
+
+    curl -X POST http://localhost:8080/api/batch/run
+    curl       http://localhost:8080/api/batch/status
+
+### Concurrent run guard
+
+`BatchPipelineService` uses an `AtomicBoolean` to prevent two triggers
+from running the pipeline simultaneously. If the scheduler fires while
+a REST-triggered run is in progress, the scheduled run is skipped and
+logged as a warning. The REST endpoint returns HTTP 409.
 
 ## Jobs and steps
 
@@ -50,10 +110,20 @@ Runs once per inbound file. Accepts `fileName` as a job parameter.
 | Step | Type | What it does |
 |---|---|---|
 | setupStep | Tasklet | Creates batch_jobs and transaction_batches rows, stores IDs in ExecutionContext |
-| loadStep | Chunk (500) | FlatFileItemReader -> processor sets batchId -> JdbcBatchItemWriter into staged_transactions |
+| loadStep | Chunk (500) | FlatFileItemReader → processor sets batchId → JdbcBatchItemWriter into staged_transactions |
+
+All chunk-oriented steps (load, validate, post) use a chunk size of 500 items.
+Each chunk is wrapped in a transaction, so a failure rolls back only the current
+chunk, not the entire job.
 
 The load job uses `@StepScope` on the reader and setup tasklet so that
 each file gets its own instances with the correct filename parameter.
+
+`staged_transactions.account_id` carries no foreign key constraint.
+Staging is the raw intake layer — records with unknown account IDs load
+successfully and are caught by Rule 3 during the validate job. Enforcing
+referential integrity at the staging level would make those failure cases
+impossible to load and therefore impossible to test.
 
 ### Validate (validateTransactionsJob)
 
@@ -74,7 +144,8 @@ Validation rules:
 The validate worker step uses a **skip policy**: when the processor
 throws a `ValidationException`, Spring Batch skips the record
 (up to 10,000 skips) and the `ValidationSkipListener` marks it rejected
-and logs the error.
+and logs the error. The `ValidationWriter` uses `JdbcTemplate.batchUpdate()`
+to update the entire chunk in a single round-trip.
 
 ### Post (postTransactionsJob)
 
@@ -86,8 +157,10 @@ Runs once, posting all validated records.
 | postStep | Partitioned master step | Builds one partition per `batch_id` with validated records |
 | postWorkerStep | Chunk (500) | Reads one partition's validated records and posts them |
 
-The `PostingWriter` inserts each record into the production
-`transactions` table and updates the staged status to `posted`.
+The `PostingWriter` inserts records into the production `transactions`
+table and updates staged status to `posted`. Both operations use
+`JdbcTemplate.batchUpdate()` — the entire chunk is sent to the database
+in a single round-trip rather than one statement per record.
 
 ### Reconcile (reconcileJob)
 
@@ -97,8 +170,16 @@ Runs once, checking all batches.
 |---|---|---|
 | reconcileStep | Tasklet | Queries staged vs production counts/totals per batch, writes to batch_reconciliations |
 
-Reconciliation matches staged posted records to production by
-account_id, merchant_id, direction, and amount_cents.
+Reconciliation compares staged records (`status = 'posted'`) against
+production records scoped by `batch_id`. For each batch it checks:
+- count of staged posted records == count of transactions
+- sum of staged amounts == sum of transaction amounts
+
+Both `counts_match` and `totals_match` are recorded as boolean flags in
+`batch_reconciliations`. After the reconcile job completes,
+`BatchPipelineService` queries for any failed flags and throws if any
+batch did not balance, halting the pipeline before the summary report is
+generated.
 
 ## Partitioning
 
@@ -127,12 +208,68 @@ allowing parallel execution through the partitioned master step.
 | ValidationSkipListener | Validate worker step | Marks rejected records, logs errors to batch_job_errors |
 | ProgressListener | Load, validate, post worker steps | Logs read/written/skipped counts after each chunk |
 
+## Observability
+
+### Health endpoints
+
+The following health endpoints are available in non-sandbox profiles:
+
+| Endpoint | Group members | Purpose |
+|---|---|---|
+| `/actuator/health` | All contributors | Full view — DB, disk, liveness, readiness |
+| `/actuator/health/liveness` | `livenessState` | Is the JVM process alive? Used for OpenShift liveness probe |
+| `/actuator/health/readiness` | `readinessState`, `db` | Is the app ready and the database reachable? Used for OpenShift readiness probe |
+
+### Prometheus metrics
+
+`/actuator/prometheus` exposes all metrics in Prometheus exposition format.
+A Prometheus server scrapes this endpoint on a schedule; Grafana queries
+Prometheus to render dashboards and fire alerts.
+
+Key Spring Batch metrics available after a pipeline run:
+
+| Metric | What it measures |
+|---|---|
+| `spring_batch_job_seconds` | Duration per job, labelled by job name and status |
+| `spring_batch_step_seconds` | Duration per step, labelled by job, step name, and status |
+| `spring_batch_item_process_seconds` | Item processing time, labelled by status (`SUCCESS` / `FAILURE`) |
+| `spring_batch_job_launch_count_total` | Total job launches since startup |
+
+### Structured logging
+
+Log output format depends on the active profile:
+
+| Profile | Format |
+|---|---|
+| `sandbox`, `batchtest` | Plain text (readable in local console and test output) |
+| `dev`, `test`, `prod` | JSON (Logstash format — suitable for Splunk, ELK, Datadog) |
+
+`BatchPipelineService` sets two MDC fields at the start of each pipeline run:
+
+| Field | Value | Scope |
+|---|---|---|
+| `pipeline.runId` | Epoch millis of the run start timestamp | Entire pipeline run |
+| `job.name` | Name of the current job being launched | Per-job |
+
+Because MDC is thread-local and all jobs run synchronously on the same thread,
+these fields appear on every log line — including framework-level Spring Batch
+logs — for the duration of the run. In a log aggregator, filtering by
+`pipeline.runId` returns the complete trace of a single pipeline run across
+all classes.
+
 ## Error handling
 
 - **Skip policy**: the validate worker step tolerates up to 10,000
   `ValidationException` skips before aborting.
 - **Job completion listeners**: detect failed jobs and update batch_jobs
   status.
+- **Reconciliation escalation**: after the reconcile job completes,
+  `BatchPipelineService` checks `batch_reconciliations` for any rows
+  where `counts_match = false` or `totals_match = false` scoped to the
+  current run. If any are found, it throws before generating the summary
+  report. The reconcile job itself always completes (preserving the audit
+  rows), but the pipeline halts and the exception propagates to the
+  caller (scheduler logs it; REST controller returns 500).
 - **Restartability**: Spring Batch tracks job state in its metadata
   tables. Partitioning avoids the shared-reader restart warnings seen
   with the earlier async chunking approach.
@@ -150,3 +287,66 @@ allowing parallel execution through the partitioned master step.
 Spring Batch also maintains its own metadata tables
 (`BATCH_JOB_INSTANCE`, `BATCH_JOB_EXECUTION`, and related tables)
 which track job state for restartability.
+
+## Test CSV files
+
+Six test CSV files live in `app/src/main/resources/` alongside the
+production ACH files. They are used during development and integration
+testing to exercise specific validation scenarios without relying on
+the full production data set.
+
+| File | Scenario |
+|---|---|
+| `test_all_valid.csv` | Three records that pass all validation rules |
+| `test_invalid_amounts.csv` | Two zero/negative amounts (Rule 1) + one valid |
+| `test_invalid_directions.csv` | Three invalid direction values (Rule 2) |
+| `test_unknown_account.csv` | One record with account 9999, which does not exist (Rule 3) |
+| `test_inactive_account.csv` | One record with account 2004, which is frozen (Rule 4) |
+| `test_mixed.csv` | Five records covering valid, zero amount, unknown account, and invalid direction |
+
+### Switching between ACH and test files
+
+`application.yml` controls which files the pipeline processes. Comment
+out the set you do not want to run:
+
+    batch-pipeline:
+      files:
+        # ACH files (production data)
+        #- ach_20250310.csv
+        #- ach_20250317.csv
+        #- ach_20250324.csv
+        # Test files (comment out ACH above, uncomment these)
+        - test_all_valid.csv
+        - test_invalid_amounts.csv
+        - test_invalid_directions.csv
+        - test_unknown_account.csv
+        - test_inactive_account.csv
+        - test_mixed.csv
+
+Integration tests do not use this list — they call the load job directly
+with a specific `fileName` parameter via `JobParametersBuilder`, so
+`application.yml` does not affect them.
+
+## Summary report
+
+The summary report is **cumulative across all pipeline runs** recorded in the
+database. Each section queries the full history:
+
+| Section | What it shows |
+|---|---|
+| JOBS | One row per job type, with record counts and durations summed across all runs |
+| INBOUND FILES | Every batch ever loaded, one row per file per run |
+| TOTALS | Aggregate counts across all staged_transactions |
+| REJECTION REASONS | All errors grouped by message across all runs |
+| RECONCILIATION | All reconciliation results across all runs |
+
+The JOBS section groups by `job_name` and sums `record_count` and duration,
+so the running totals grow with each pipeline execution. This gives a
+cumulative picture of throughput rather than a per-run snapshot.
+
+Note: individual `batch_jobs` rows store the correct count for their own run
+(scoped via `run.id` in the completion listeners), so the summed totals
+accurately reflect actual work done across all runs.
+
+Reports are printed to the console and saved to
+`app/reports/batch_report_YYYYMMDD_HHmmss.txt` (excluded from git).
