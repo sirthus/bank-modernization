@@ -7,8 +7,10 @@ import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobParametersBuilder;
 import org.springframework.batch.core.launch.JobLauncher;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.util.Date;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -34,6 +36,7 @@ public class BatchPipelineService {
     private final Job reconcileJob;
     private final BatchSummaryReport summaryReport;
     private final BatchPipelineProperties pipelineProperties;
+    private final JdbcTemplate jdbcTemplate;
 
     public BatchPipelineService(JobLauncher jobLauncher,
                                 @Qualifier("loadTransactionsJob") Job loadTransactionsJob,
@@ -41,7 +44,8 @@ public class BatchPipelineService {
                                 @Qualifier("postTransactionsJob") Job postTransactionsJob,
                                 @Qualifier("reconcileJob") Job reconcileJob,
                                 BatchSummaryReport summaryReport,
-                                BatchPipelineProperties pipelineProperties) {
+                                BatchPipelineProperties pipelineProperties,
+                                JdbcTemplate jdbcTemplate) {
         this.jobLauncher = jobLauncher;
         this.loadTransactionsJob = loadTransactionsJob;
         this.validateTransactionsJob = validateTransactionsJob;
@@ -49,6 +53,7 @@ public class BatchPipelineService {
         this.reconcileJob = reconcileJob;
         this.summaryReport = summaryReport;
         this.pipelineProperties = pipelineProperties;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     /**
@@ -103,6 +108,22 @@ public class BatchPipelineService {
                 new JobParametersBuilder()
                     .addLong("run.id", runTimestamp.getTime())
                     .toJobParameters());
+
+            // Fail the pipeline if any batch did not balance. The reconcile job
+            // always completes (so audit rows are committed), but we surface the
+            // discrepancy here before generating the summary report.
+            Integer reconFailures = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM bank.batch_reconciliations br " +
+                "JOIN bank.batch_jobs bj ON bj.id = br.batch_job_id " +
+                "WHERE bj.started_at >= ? " +
+                "  AND (NOT br.counts_match OR NOT br.totals_match)",
+                Integer.class, new Timestamp(runTimestamp.getTime()));
+
+            if (reconFailures != null && reconFailures > 0) {
+                throw new RuntimeException(
+                    "Pipeline halted: reconciliation failed for " + reconFailures +
+                    " batch(es) — check bank.batch_reconciliations for details");
+            }
 
             MDC.remove("job.name");
             summaryReport.print();

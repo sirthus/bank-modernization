@@ -75,6 +75,10 @@ class ReconcileJobTest {
         return jobLauncherTestUtils.launchJob(params);
     }
 
+    // -------------------------------------------------------------------------
+    // Happy path
+    // -------------------------------------------------------------------------
+
     @Test
     void reconcileJob_postedBatch_writesMatchingCountsAndTotals() throws Exception {
         long runId = System.currentTimeMillis();
@@ -119,6 +123,169 @@ class ReconcileJobTest {
         assertThat(recon.get("posted_count")).isEqualTo(2);
         assertThat(recon.get("staged_total_cents")).isEqualTo(6500L);
         assertThat(recon.get("posted_total_cents")).isEqualTo(6500L);
+        assertThat(recon.get("counts_match")).isEqualTo(true);
+        assertThat(recon.get("totals_match")).isEqualTo(true);
+    }
+
+    // -------------------------------------------------------------------------
+    // Mismatch scenarios
+    // -------------------------------------------------------------------------
+
+    @Test
+    void reconcileJob_missingTransaction_countsDoNotMatch() throws Exception {
+        long runId = System.currentTimeMillis();
+        int batchId = insertBatch(runId);
+
+        // 2 staged records marked posted
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2001, 'D', 5000, '2025-03-10', 'posted')", batchId);
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2002, 'C', 1500, '2025-03-10', 'posted')", batchId);
+
+        // Only 1 transaction row — simulates a posting failure mid-batch
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2001, 'D', 5000, 'posted', 'Batch posted', ?)", batchId);
+
+        JobExecution execution = jobLauncherTestUtils.launchJob(
+                new JobParametersBuilder()
+                        .addLong("run.id", runId)
+                        .toJobParameters());
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+
+        Map<String, Object> recon = jdbcTemplate.queryForMap(
+                "SELECT staged_count, posted_count, counts_match, totals_match " +
+                "FROM bank.batch_reconciliations");
+
+        assertThat(recon.get("staged_count")).isEqualTo(2);
+        assertThat(recon.get("posted_count")).isEqualTo(1);
+        assertThat(recon.get("counts_match")).isEqualTo(false);
+        assertThat(recon.get("totals_match")).isEqualTo(false);
+    }
+
+    @Test
+    void reconcileJob_wrongTransactionAmount_totalsDoNotMatch() throws Exception {
+        long runId = System.currentTimeMillis();
+        int batchId = insertBatch(runId);
+
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2001, 'D', 5000, '2025-03-10', 'posted')", batchId);
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2002, 'C', 1500, '2025-03-10', 'posted')", batchId);
+
+        // Counts match, but one transaction has a corrupted amount
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2001, 'D', 5000, 'posted', 'Batch posted', ?)", batchId);
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2002, 'C', 9999, 'posted', 'Batch posted', ?)", batchId);
+
+        JobExecution execution = jobLauncherTestUtils.launchJob(
+                new JobParametersBuilder()
+                        .addLong("run.id", runId)
+                        .toJobParameters());
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+
+        Map<String, Object> recon = jdbcTemplate.queryForMap(
+                "SELECT staged_count, posted_count, staged_total_cents, posted_total_cents, " +
+                "counts_match, totals_match " +
+                "FROM bank.batch_reconciliations");
+
+        assertThat(recon.get("staged_count")).isEqualTo(2);
+        assertThat(recon.get("posted_count")).isEqualTo(2);
+        assertThat(recon.get("staged_total_cents")).isEqualTo(6500L);
+        assertThat(recon.get("posted_total_cents")).isEqualTo(14999L);
+        assertThat(recon.get("counts_match")).isEqualTo(true);
+        assertThat(recon.get("totals_match")).isEqualTo(false);
+    }
+
+    @Test
+    void reconcileJob_extraTransaction_countsDoNotMatch() throws Exception {
+        // Simulates a duplicate-posting bug: one staged record but two transaction rows.
+        long runId = System.currentTimeMillis();
+        int batchId = insertBatch(runId);
+
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2001, 'D', 5000, '2025-03-10', 'posted')", batchId);
+
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2001, 'D', 5000, 'posted', 'Batch posted', ?)", batchId);
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2001, 'D', 5000, 'posted', 'Batch posted', ?)", batchId);
+
+        JobExecution execution = jobLauncherTestUtils.launchJob(
+                new JobParametersBuilder()
+                        .addLong("run.id", runId)
+                        .toJobParameters());
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+
+        Map<String, Object> recon = jdbcTemplate.queryForMap(
+                "SELECT staged_count, posted_count, counts_match, totals_match " +
+                "FROM bank.batch_reconciliations");
+
+        assertThat(recon.get("staged_count")).isEqualTo(1);
+        assertThat(recon.get("posted_count")).isEqualTo(2);
+        assertThat(recon.get("counts_match")).isEqualTo(false);
+        assertThat(recon.get("totals_match")).isEqualTo(false);
+    }
+
+    @Test
+    void reconcileJob_rejectedRecordsExcluded_countsMatchPostedOnly() throws Exception {
+        // Rejected staged records must not be counted — reconcile compares
+        // staged WHERE status='posted' vs transactions, so a rejected record
+        // that correctly has no transaction row should still PASS.
+        long runId = System.currentTimeMillis();
+        int batchId = insertBatch(runId);
+
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2001, 'D', 5000, '2025-03-10', 'posted')", batchId);
+        jdbcTemplate.update(
+                "INSERT INTO bank.staged_transactions " +
+                "(batch_id, account_id, direction, amount_cents, txn_date, status) " +
+                "VALUES (?, 2002, 'C', 1500, '2025-03-10', 'rejected')", batchId);
+
+        // Only the posted record makes it to transactions
+        jdbcTemplate.update(
+                "INSERT INTO bank.transactions " +
+                "(account_id, direction, amount_cents, status, description, batch_id) " +
+                "VALUES (2001, 'D', 5000, 'posted', 'Batch posted', ?)", batchId);
+
+        JobExecution execution = jobLauncherTestUtils.launchJob(
+                new JobParametersBuilder()
+                        .addLong("run.id", runId)
+                        .toJobParameters());
+
+        assertThat(execution.getStatus()).isEqualTo(BatchStatus.COMPLETED);
+
+        Map<String, Object> recon = jdbcTemplate.queryForMap(
+                "SELECT staged_count, posted_count, counts_match, totals_match " +
+                "FROM bank.batch_reconciliations");
+
+        assertThat(recon.get("staged_count")).isEqualTo(1);  // rejected excluded
+        assertThat(recon.get("posted_count")).isEqualTo(1);
         assertThat(recon.get("counts_match")).isEqualTo(true);
         assertThat(recon.get("totals_match")).isEqualTo(true);
     }

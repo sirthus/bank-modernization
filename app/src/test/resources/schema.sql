@@ -58,12 +58,13 @@ CREATE INDEX transactions_merchant_id_idx ON bank.transactions (merchant_id);
 
 -- 007
 CREATE TABLE bank.batch_jobs (
-    id          INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    job_name    VARCHAR(100)    NOT NULL,
-    status      VARCHAR(20)     NOT NULL DEFAULT 'running',
-    started_at  TIMESTAMPTZ     NOT NULL DEFAULT now(),
-    finished_at TIMESTAMPTZ,
-    records_processed INTEGER
+    id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    job_name        VARCHAR(100)    NOT NULL,
+    status          VARCHAR(20)     NOT NULL DEFAULT 'running',
+    started_at      TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    finished_at     TIMESTAMPTZ,
+    record_count    INTEGER,
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
 
 -- 008
@@ -71,8 +72,10 @@ CREATE TABLE bank.transaction_batches (
     id              INTEGER GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     batch_job_id    INTEGER         NOT NULL REFERENCES bank.batch_jobs(id),
     file_name       VARCHAR(255)    NOT NULL,
+    record_count    INTEGER,
     status          VARCHAR(20)     NOT NULL DEFAULT 'received',
-    received_at     TIMESTAMPTZ     NOT NULL DEFAULT now()
+    received_at     TIMESTAMPTZ     NOT NULL DEFAULT now(),
+    created_at      TIMESTAMPTZ     NOT NULL DEFAULT now()
 );
 
 -- 009
