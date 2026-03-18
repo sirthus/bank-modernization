@@ -39,7 +39,7 @@ called by whichever trigger is active for the current profile.
         |-- records results in batch_reconciliations
         v
     [Summary Report]
-        |-- scoped to the current run (filters by run start timestamp)
+        |-- cumulative across all runs (grouped totals per job type)
         |-- prints to console
         |-- saves to app/reports/batch_report_YYYYMMDD_HHmmss.txt
 
@@ -144,7 +144,8 @@ Validation rules:
 The validate worker step uses a **skip policy**: when the processor
 throws a `ValidationException`, Spring Batch skips the record
 (up to 10,000 skips) and the `ValidationSkipListener` marks it rejected
-and logs the error.
+and logs the error. The `ValidationWriter` uses `JdbcTemplate.batchUpdate()`
+to update the entire chunk in a single round-trip.
 
 ### Post (postTransactionsJob)
 
@@ -156,8 +157,10 @@ Runs once, posting all validated records.
 | postStep | Partitioned master step | Builds one partition per `batch_id` with validated records |
 | postWorkerStep | Chunk (500) | Reads one partition's validated records and posts them |
 
-The `PostingWriter` inserts each record into the production
-`transactions` table and updates the staged status to `posted`.
+The `PostingWriter` inserts records into the production `transactions`
+table and updates staged status to `posted`. Both operations use
+`JdbcTemplate.batchUpdate()` — the entire chunk is sent to the database
+in a single round-trip rather than one statement per record.
 
 ### Reconcile (reconcileJob)
 
@@ -167,8 +170,16 @@ Runs once, checking all batches.
 |---|---|---|
 | reconcileStep | Tasklet | Queries staged vs production counts/totals per batch, writes to batch_reconciliations |
 
-Reconciliation matches staged posted records to production by
-account_id, merchant_id, direction, and amount_cents.
+Reconciliation compares staged records (`status = 'posted'`) against
+production records scoped by `batch_id`. For each batch it checks:
+- count of staged posted records == count of transactions
+- sum of staged amounts == sum of transaction amounts
+
+Both `counts_match` and `totals_match` are recorded as boolean flags in
+`batch_reconciliations`. After the reconcile job completes,
+`BatchPipelineService` queries for any failed flags and throws if any
+batch did not balance, halting the pipeline before the summary report is
+generated.
 
 ## Partitioning
 
@@ -252,6 +263,13 @@ all classes.
   `ValidationException` skips before aborting.
 - **Job completion listeners**: detect failed jobs and update batch_jobs
   status.
+- **Reconciliation escalation**: after the reconcile job completes,
+  `BatchPipelineService` checks `batch_reconciliations` for any rows
+  where `counts_match = false` or `totals_match = false` scoped to the
+  current run. If any are found, it throws before generating the summary
+  report. The reconcile job itself always completes (preserving the audit
+  rows), but the pipeline halts and the exception propagates to the
+  caller (scheduler logs it; REST controller returns 500).
 - **Restartability**: Spring Batch tracks job state in its metadata
   tables. Partitioning avoids the shared-reader restart warnings seen
   with the earlier async chunking approach.
@@ -311,13 +329,24 @@ with a specific `fileName` parameter via `JobParametersBuilder`, so
 
 ## Summary report
 
-The summary report is scoped to the current pipeline run. All queries
-filter to `bank.batch_jobs` rows with `started_at >= runSince`, where
-`runSince` is the timestamp captured at the start of
-`BatchPipelineService.run()`. Totals, file summaries, rejection reasons,
-and reconciliation results all cascade from that anchor, so a database
-with history from previous runs produces a clean, accurate report for
-the run just completed.
+The summary report is **cumulative across all pipeline runs** recorded in the
+database. Each section queries the full history:
+
+| Section | What it shows |
+|---|---|
+| JOBS | One row per job type, with record counts and durations summed across all runs |
+| INBOUND FILES | Every batch ever loaded, one row per file per run |
+| TOTALS | Aggregate counts across all staged_transactions |
+| REJECTION REASONS | All errors grouped by message across all runs |
+| RECONCILIATION | All reconciliation results across all runs |
+
+The JOBS section groups by `job_name` and sums `record_count` and duration,
+so the running totals grow with each pipeline execution. This gives a
+cumulative picture of throughput rather than a per-run snapshot.
+
+Note: individual `batch_jobs` rows store the correct count for their own run
+(scoped via `run.id` in the completion listeners), so the summed totals
+accurately reflect actual work done across all runs.
 
 Reports are printed to the console and saved to
 `app/reports/batch_report_YYYYMMDD_HHmmss.txt` (excluded from git).

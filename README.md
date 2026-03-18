@@ -144,6 +144,8 @@ profile. The database must be running before `mvn test` is executed.
 | `LoadTransactionsJobTest` | Integration | Load job stages all records regardless of validity; record counts per file; all records arrive with `staged` status |
 | `ValidateTransactionsJobTest` | Integration | All-valid happy path; invalid amounts; unknown account; inactive account; mixed batch counts and error messages |
 | `PostTransactionsJobTest` | Integration | Validated records posted and marked `posted`; rejected records untouched; column value correctness; empty database edge case |
+| `ReconcileJobTest` | Integration | Happy path (counts and totals match); missing transaction; wrong amount; extra transaction (duplicate post); rejected records correctly excluded from staged count |
+| `FullPipelineTest` | End-to-end | Full Load → Validate → Post → Reconcile sequence against real CSVs; asserts final state across all four tables; reconciliation failure detection when a transaction is deleted after posting |
 
 ### Test types in use
 
@@ -152,10 +154,16 @@ directly with `new` — no Spring context, no database. They run in under a
 second and are the first line of defence for logic defects.
 
 **Integration tests** (`LoadTransactionsJobTest`, `ValidateTransactionsJobTest`,
-`PostTransactionsJobTest`) use `@SpringBatchTest` + `@SpringBootTest` with
-`@ActiveProfiles("batchtest")`. They load the full application context and run
-against `modernize_buildtest`. Each test class uses `@BeforeEach` to clear
-staged data so tests are independent.
+`PostTransactionsJobTest`, `ReconcileJobTest`) use `@SpringBatchTest` +
+`@SpringBootTest` with `@ActiveProfiles("batchtest")`. They load the full
+application context and run against `modernize_buildtest`. Each test class uses
+`@BeforeEach` to clear staged data so tests are independent.
+
+**End-to-end tests** (`FullPipelineTest`) run all four jobs in sequence using
+real CSV files from the classpath. No data is pre-inserted — the load job
+produces what validate expects, validate produces what post expects, and so on.
+These tests verify the hand-offs between jobs and the final state across all
+four bank schema tables.
 
 ## Scripts
 
