@@ -1,0 +1,10 @@
+# Schedule override profile.
+# Add "sched" to your active profiles to enable per-minute scheduling.
+# This avoids shell quoting problems with cron expressions on the command line.
+#
+# Usage:
+#   cd app && mvn spring-boot:run "-Dspring-boot.run.profiles=dev,sched"
+#
+# Spring applies profiles left to right, so "sched" overrides "dev".
+batch-pipeline:
+  schedule: "0 * * * * ?"

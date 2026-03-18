@@ -8,9 +8,10 @@ VALUES
 
 INSERT INTO bank.accounts (account_id, customer_id, account_type, status, opened_at, credit_limit_cents)
 VALUES
-    (2001, 1001, 'checking', 'active', CURRENT_DATE, 0),
-    (2002, 1001, 'credit',   'active', CURRENT_DATE, 500000),
-    (2003, 1002, 'savings',  'active', CURRENT_DATE, 0);
+    (2001, 1001, 'checking', 'active',  CURRENT_DATE, 0),
+    (2002, 1001, 'credit',   'active',  CURRENT_DATE, 500000),
+    (2003, 1002, 'savings',  'active',  CURRENT_DATE, 0),
+    (2004, 1002, 'checking', 'frozen',  CURRENT_DATE, 0);
 
 INSERT INTO bank.merchants (merchant_id, name, category, created_at)
 VALUES

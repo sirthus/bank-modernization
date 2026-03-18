@@ -8,8 +8,39 @@ spring:
     job:
       enabled: false
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: always
+      group:
+        liveness:
+          include: livenessState
+        readiness:
+          include: readinessState,db
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 batch-pipeline:
   files:
+  # select ACH or test (comment out the other)
     - ach_20250310.csv
     - ach_20250317.csv
     - ach_20250324.csv
+    #- test_all_valid.csv
+    #- test_invalid_amounts.csv
+    #- test_invalid_directions.csv
+    #- test_unknown_account.csv
+    #- test_inactive_account.csv
+    #- test_mixed.csv
+  # Cron schedule for BatchScheduler. Uses Spring cron format:
+  #   second  minute  hour  day-of-month  month  day-of-week
+  # Default: nightly at 2:00 AM. Each profile can override this.
+  # Set to "-" to disable the scheduler entirely.
+  schedule: "0 0 2 * * ?"
