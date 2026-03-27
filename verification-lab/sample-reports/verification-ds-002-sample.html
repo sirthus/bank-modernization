@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Verification Report — ds-002</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            font-size: 14px;
+            line-height: 1.5;
+            color: #1a1a1a;
+            background: #f5f5f5;
+        }
+
+        /* ── Header band ──────────────────────────────────────────────────────── */
+        .header {
+            background: #1e293b;
+            color: #f8fafc;
+            padding: 24px 32px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .header h1 { font-size: 18px; font-weight: 600; }
+        .header .meta { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+        /* ── Status badge ─────────────────────────────────────────────────────── */
+        .badge {
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        .badge-PASS                { background: #16a34a; color: #fff; }
+        .badge-WARNING             { background: #d97706; color: #fff; }
+        .badge-FAIL                { background: #dc2626; color: #fff; }
+        .badge-APPROVED_DIFFERENCE { background: #2563eb; color: #fff; }
+
+        /* ── Main content ─────────────────────────────────────────────────────── */
+        .content { padding: 24px 32px; max-width: 1100px; margin: 0 auto; }
+
+        section { background: #fff; border-radius: 6px; padding: 20px 24px; margin-bottom: 20px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        section h2 { font-size: 14px; font-weight: 600; text-transform: uppercase;
+                     letter-spacing: 0.05em; color: #64748b; margin-bottom: 14px; }
+
+        /* ── Summary counts ───────────────────────────────────────────────────── */
+        .counts { display: flex; gap: 16px; flex-wrap: wrap; }
+        .count-cell {
+            flex: 1; min-width: 100px; text-align: center;
+            border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;
+        }
+        .count-cell .number { font-size: 28px; font-weight: 700; }
+        .count-cell .label  { font-size: 11px; color: #64748b; text-transform: uppercase; margin-top: 2px; }
+        .count-warning  { color: #d97706; }
+        .count-fail     { color: #dc2626; }
+        .count-approved { color: #2563eb; }
+
+        /* ── Tables ───────────────────────────────────────────────────────────── */
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            text-align: left; font-size: 11px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em;
+            color: #64748b; border-bottom: 2px solid #e2e8f0;
+            padding: 8px 12px;
+        }
+        td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+        tr:last-child td { border-bottom: none; }
+
+        .row-FAIL                td:first-child { border-left: 3px solid #dc2626; }
+        .row-WARNING             td:first-child { border-left: 3px solid #d97706; }
+        .row-APPROVED_DIFFERENCE td:first-child { border-left: 3px solid #2563eb; }
+
+        .class-FAIL                { color: #dc2626; font-weight: 600; }
+        .class-WARNING             { color: #d97706; font-weight: 600; }
+        .class-APPROVED_DIFFERENCE { color: #2563eb; font-weight: 600; }
+        .class-PASS                { color: #16a34a; font-weight: 600; }
+
+        /* ── Empty state ──────────────────────────────────────────────────────── */
+        .empty-state {
+            text-align: center; padding: 32px; color: #94a3b8;
+            font-style: italic;
+        }
+
+        /* ── Rationale text ───────────────────────────────────────────────────── */
+        .rationale { font-size: 12px; color: #475569; margin-top: 4px; }
+
+        /* ── Approved differences detail ──────────────────────────────────────── */
+        .approval-card {
+            border: 1px solid #e2e8f0; border-radius: 6px;
+            padding: 14px 16px; margin-bottom: 12px;
+        }
+        .approval-card:last-child { margin-bottom: 0; }
+        .approval-id { font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+        .approval-field { font-family: monospace; font-size: 13px; margin-bottom: 6px; }
+        .approval-rationale { font-size: 13px; color: #334155; margin-bottom: 8px; }
+        .approval-meta { font-size: 11px; color: #64748b; }
+        .unsigned-flag {
+            display: inline-block; background: #fef3c7; color: #92400e;
+            border: 1px solid #fcd34d; border-radius: 3px;
+            padding: 2px 8px; font-size: 11px; font-weight: 600; margin-bottom: 6px;
+        }
+
+        /* ── Footer ───────────────────────────────────────────────────────────── */
+        .footer {
+            font-size: 11px; color: #94a3b8; padding: 16px 32px;
+            border-top: 1px solid #e2e8f0; margin-top: 8px;
+        }
+        .footer span { margin-right: 24px; }
+
+        code { font-family: monospace; font-size: 12px; background: #f8fafc;
+               padding: 1px 4px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+<!-- ── Header band ──────────────────────────────────────────────────────────── -->
+<div class="header">
+    <span class="badge badge-FAIL">FAIL</span>
+    <div>
+        <h1>Verification Report — ds-002</h1>
+        <div class="meta">Four records. Legacy system truncated intermediate calculations; per-record amounts are understated by 1-2 cents. No approval entry exists. Expected result: Fail.</div>
+    </div>
+</div>
+
+<div class="content">
+
+    <!-- ── Summary counts ─────────────────────────────────────────────────────── -->
+    <section>
+        <h2>Summary</h2>
+        <div class="counts">
+            <div class="count-cell">
+                <div class="number count-warning">0</div>
+                <div class="label">Warning</div>
+            </div>
+            <div class="count-cell">
+                <div class="number count-fail">4</div>
+                <div class="label">Fail</div>
+            </div>
+            <div class="count-cell">
+                <div class="number count-approved">0</div>
+                <div class="label">Approved</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Discrepancies ──────────────────────────────────────────────────────── -->
+    <section>
+        <h2>Discrepancies</h2>
+
+        
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Field</th>
+                    <th>Expected (baseline)</th>
+                    <th>Actual (modern)</th>
+                    <th>Classification</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="row-FAIL">
+                    <td><code>totalPostedCents</code></td>
+                    <td>67777</td>
+                    <td>67781</td>
+                    <td>
+                        <span class="class-FAIL">FAIL</span>
+                    </td>
+                    <td>
+                        
+                        <span style="color:#94a3b8">—</span>
+                    </td>
+                </tr>
+                <tr class="row-FAIL">
+                    <td><code>transactions[0].amountCents</code></td>
+                    <td>7777</td>
+                    <td>7778</td>
+                    <td>
+                        <span class="class-FAIL">FAIL</span>
+                    </td>
+                    <td>
+                        
+                        <span style="color:#94a3b8">—</span>
+                    </td>
+                </tr>
+                <tr class="row-FAIL">
+                    <td><code>transactions[1].amountCents</code></td>
+                    <td>10000</td>
+                    <td>10001</td>
+                    <td>
+                        <span class="class-FAIL">FAIL</span>
+                    </td>
+                    <td>
+                        
+                        <span style="color:#94a3b8">—</span>
+                    </td>
+                </tr>
+                <tr class="row-FAIL">
+                    <td><code>transactions[3].amountCents</code></td>
+                    <td>30000</td>
+                    <td>30002</td>
+                    <td>
+                        <span class="class-FAIL">FAIL</span>
+                    </td>
+                    <td>
+                        
+                        <span style="color:#94a3b8">—</span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- ── Approved differences detail ───────────────────────────────────────── -->
+    
+
+</div>
+
+<!-- ── Footer ───────────────────────────────────────────────────────────────── -->
+<div class="footer">
+    <span>Dataset: <strong>ds-002</strong></span>
+    <span>Commit: <code>ead1120</code></span>
+    <span>Environment: <code>verificationlab</code></span>
+    <span>Generated: <span>2026-03-27T03:06:07.654370200Z</span></span>
+</div>
+
+</body>
+</html>

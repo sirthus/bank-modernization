@@ -1,5 +1,7 @@
 # Bank Modernization
 
+[![Maven Test](https://github.com/sirthus/bank-modernization/actions/workflows/maven-test.yml/badge.svg)](https://github.com/sirthus/bank-modernization/actions/workflows/maven-test.yml)
+
 A simulated bank batch processing system built with **Java 21, Spring Boot 3.4, Spring Batch, and PostgreSQL 18**, modeling the kind of COBOL-to-Java migration happening across government and financial services. The project implements a complete inbound ACH transaction pipeline — from CSV intake through validation, posting, and reconciliation — with partitioned parallel execution, skip-based error handling, and a full integration test suite.
 
 ## Why this project exists
@@ -147,3 +149,4 @@ The repo includes a Maven wrapper (`app/mvnw`) — no separate Maven installatio
 - [`verification-lab/README.md`](verification-lab/README.md) — how to run the verification lab, report format, CI integration
 - [`docs/verification-lab-overview.md`](docs/verification-lab-overview.md) — verification design: classification model, normalization rules, approval policy, baseline format
 - [`docs/verification-case-study.md`](docs/verification-case-study.md) — engineering narrative: why the lab exists, design decisions, what each dataset demonstrates
+- [`verification-lab/sample-reports/`](verification-lab/sample-reports/) — representative HTML and JSON evidence reports from a DS-002 run

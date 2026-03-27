@@ -1,0 +1,37 @@
+{
+  "datasetId" : "ds-002",
+  "datasetDescription" : "Four records. Legacy system truncated intermediate calculations; per-record amounts are understated by 1-2 cents. No approval entry exists. Expected result: Fail.",
+  "timestamp" : "2026-03-27T03:06:07.654370200Z",
+  "commitSha" : "ead1120",
+  "environment" : "verificationlab",
+  "overallStatus" : "FAIL",
+  "passCount" : 13,
+  "warningCount" : 0,
+  "failCount" : 4,
+  "approvedCount" : 0,
+  "discrepancies" : [ {
+    "field" : "totalPostedCents",
+    "expectedValue" : "67777",
+    "actualValue" : "67781",
+    "classification" : "FAIL",
+    "rationale" : null
+  }, {
+    "field" : "transactions[0].amountCents",
+    "expectedValue" : "7777",
+    "actualValue" : "7778",
+    "classification" : "FAIL",
+    "rationale" : null
+  }, {
+    "field" : "transactions[1].amountCents",
+    "expectedValue" : "10000",
+    "actualValue" : "10001",
+    "classification" : "FAIL",
+    "rationale" : null
+  }, {
+    "field" : "transactions[3].amountCents",
+    "expectedValue" : "30000",
+    "actualValue" : "30002",
+    "classification" : "FAIL",
+    "rationale" : null
+  } ]
+}
