@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+         https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <!--
+        Inherits Spring Boot dependency management (versions for Jackson, Thymeleaf,
+        SnakeYAML, JUnit 5, etc.) without making this module a bootable application.
+    -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.4.3</version>
+    </parent>
+
+    <groupId>com.modernize</groupId>
+    <artifactId>verification-lab</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+    <name>verification-lab</name>
+    <description>Verification Lab — modernization output verification for bank-batch</description>
+
+    <properties>
+        <java.version>21</java.version>
+    </properties>
+
+    <dependencies>
+
+        <!-- ── Main app ───────────────────────────────────────────────────────────
+             Thin jar (not the exec fat jar). Gives access to all pipeline classes:
+             BankBatchApplication, BatchPipelineService, Job beans, StagedTransaction,
+             ValidationProcessor, etc. Required to boot the Spring context in tests.
+        -->
+        <dependency>
+            <groupId>com.modernize</groupId>
+            <artifactId>bank-batch</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+        </dependency>
+
+        <!-- ── App test infrastructure ───────────────────────────────────────────
+             Test jar from the app module. Provides schema.sql and the batchtest
+             Spring profile config so we do not duplicate them here.
+        -->
+        <dependency>
+            <groupId>com.modernize</groupId>
+            <artifactId>bank-batch</artifactId>
+            <version>0.0.1-SNAPSHOT</version>
+            <classifier>tests</classifier>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ── Spring Boot test stack ────────────────────────────────────────────
+             JUnit 5, AssertJ, Mockito, Spring test utilities.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ── Spring Batch test utilities ──────────────────────────────────────
+             JobLauncherTestUtils, JobRepositoryTestUtils — same pattern as app tests.
+        -->
+        <dependency>
+            <groupId>org.springframework.batch</groupId>
+            <artifactId>spring-batch-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- ── PostgreSQL driver ─────────────────────────────────────────────────
+             Runtime dependency for connecting to modernize_buildtest.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ── JSON report generation ────────────────────────────────────────────
+             Jackson for serializing VerificationResult to JSON evidence reports.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+        </dependency>
+
+        <!-- ── HTML report generation ────────────────────────────────────────────
+             Thymeleaf with ClassLoaderTemplateResolver — no web context required.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
+
+        <!-- ── YAML parsing ──────────────────────────────────────────────────────
+             SnakeYAML for deserializing approved-differences/*.yml files.
+        -->
+        <dependency>
+            <groupId>org.yaml</groupId>
+            <artifactId>snakeyaml</artifactId>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- No spring-boot-maven-plugin: this module is not a bootable application. -->
+        </plugins>
+    </build>
+
+</project>

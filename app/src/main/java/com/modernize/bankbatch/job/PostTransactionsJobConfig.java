@@ -26,12 +26,21 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 
 @Configuration
+/**
+ * Configures the posting job that partitions validated records by batch_id and
+ * moves them into the production transactions table.
+ *
+ * Unlike validation, posting is not fault-tolerant because a write failure
+ * means the pipeline should stop instead of partially advancing records.
+ */
 public class PostTransactionsJobConfig {
 
     @Bean
     public Tasklet postSetupTasklet(JdbcTemplate jdbcTemplate) {
         return (contribution, chunkContext) -> {
 
+            // Create the operational job row before any worker partitions start
+            // so the completion listener can finalize a single post job record.
             jdbcTemplate.queryForObject(
                 "INSERT INTO bank.batch_jobs (job_name, status) " +
                 "VALUES ('post_transactions', 'running') RETURNING id",
@@ -63,6 +72,8 @@ public class PostTransactionsJobConfig {
         return new JdbcCursorItemReaderBuilder<StagedTransaction>()
                 .name("partitionedValidatedReader")
                 .dataSource(dataSource)
+                // Each partition gets its own reader bound to one batchId so
+                // posting can happen in parallel without mixing batch ownership.
                 .sql("SELECT id, batch_id, account_id, merchant_id, direction, amount_cents, txn_date " +
                      "FROM bank.staged_transactions " +
                      "WHERE status = 'validated' AND batch_id = ?")
@@ -96,6 +107,8 @@ public class PostTransactionsJobConfig {
         return new StepBuilder("postWorkerStep", jobRepository)
                 .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(partitionedValidatedReader)
+                // Posting must fail fast on write problems; there is no skip
+                // path because partial production writes would be unsafe.
                 .writer(postingWriter)
                 .listener(progressListener)
                 .build();
@@ -107,6 +120,8 @@ public class PostTransactionsJobConfig {
                          Partitioner postPartitioner) {
 
         SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("post-");
+        // Match validation's concurrency ceiling so posting fans out by batch
+        // but stays within the same operational database budget.
         taskExecutor.setConcurrencyLimit(4);
 
         return new StepBuilder("postStep", jobRepository)

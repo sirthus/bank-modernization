@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/modernize_prod
+    url: jdbc:postgresql://localhost:5433/modernize_prod
     username: postgres
     password: postgres
 

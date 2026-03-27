@@ -8,6 +8,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Creates one Spring Batch partition per distinct batch_id in the requested status.
+ *
+ * Validate and post share this partitioner so both jobs can process each logical
+ * inbound batch independently while still using the same worker-step definition.
+ */
 public class BatchIdPartitioner implements Partitioner {
 
     private final JdbcTemplate jdbcTemplate;
@@ -28,6 +34,8 @@ public class BatchIdPartitioner implements Partitioner {
 
         for (Integer batchId : batchIds) {
             ExecutionContext context = new ExecutionContext();
+            // Worker readers pull this value from stepExecutionContext so each
+            // partition only queries rows for its assigned batch.
             context.putInt("batchId", batchId);
             partitions.put("partition-batch-" + batchId, context);
         }

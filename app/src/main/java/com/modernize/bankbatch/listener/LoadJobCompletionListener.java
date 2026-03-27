@@ -17,12 +17,15 @@ public class LoadJobCompletionListener implements JobExecutionListener {
 
     @Override
     public void afterJob(JobExecution jobExecution) {
+        // setupBatchTasklet stored these ids in the execution context because the
+        // listener runs after the chunk step, outside the tasklet's local scope.
         int batchJobId = jobExecution.getExecutionContext().getInt("batchJobId");
         int batchId = jobExecution.getExecutionContext().getInt("batchId");
 
         if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
 
-            // Count only records in this specific batch
+            // Count after the step completes so the job row reflects the final
+            // persisted staged-record total for this inbound file.
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM bank.staged_transactions WHERE batch_id = ?",
                 Integer.class, batchId);
