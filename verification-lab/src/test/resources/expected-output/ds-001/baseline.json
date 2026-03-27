@@ -1,0 +1,19 @@
+{
+  "datasetId": "ds-001",
+  "description": "Three valid records, all accounts active, all amounts positive, all directions valid",
+  "stagedCount": 3,
+  "postedCount": 3,
+  "rejectedCount": 0,
+  "errorCount": 0,
+  "totalPostedCents": 31500,
+  "reconciliation": {
+    "countsMatch": true,
+    "totalsMatch": true
+  },
+  "transactions": [
+    { "accountId": 2001, "merchantId": 3001, "direction": "D", "amountCents": 5000,  "description": "Batch  posted" },
+    { "accountId": 2002, "merchantId": 3002, "direction": "C", "amountCents": 1500,  "description": "Batch  posted" },
+    { "accountId": 2003, "merchantId": null, "direction": "C", "amountCents": 25000, "description": "Batch  posted" }
+  ],
+  "errors": []
+}

@@ -19,6 +19,8 @@ public class ReconcileJobCompletionListener implements JobExecutionListener {
     public void afterJob(JobExecution jobExecution) {
         if (jobExecution.getStatus() != BatchStatus.COMPLETED) {
 
+            // Reconcile writes its own completion record inside the tasklet on success.
+            // The listener only needs to close out the running row on failure paths.
             jdbcTemplate.update(
                 "UPDATE bank.batch_jobs " +
                 "SET status = 'failed', finished_at = now() " +

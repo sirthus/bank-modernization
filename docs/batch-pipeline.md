@@ -350,3 +350,11 @@ accurately reflect actual work done across all runs.
 
 Reports are printed to the console and saved to
 `app/reports/batch_report_YYYYMMDD_HHmmss.txt` (excluded from git).
+
+---
+
+## Verification
+
+The Verification Lab (`verification-lab/`) is a companion module that proves the pipeline produces acceptable outputs by running the same four jobs — Load, Validate, Post, Reconcile — against fixed golden datasets and comparing actual database state against legacy-style baselines. Three datasets exercise normalization noise, monetary precision drift, and behavioral divergence on record disposition. Each run produces HTML and JSON evidence reports; CI fails on unapproved divergence.
+
+See [`verification-lab/README.md`](../verification-lab/README.md) for how to run it and read the reports.

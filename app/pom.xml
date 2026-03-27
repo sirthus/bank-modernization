@@ -111,9 +111,35 @@
 
     <build>
         <plugins>
+            <!--
+                Repackage the app as an executable fat jar with classifier "exec".
+                This keeps the original thin jar (bank-batch-0.0.1-SNAPSHOT.jar) intact
+                so verification-lab can depend on it as a compile-time artifact.
+            -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <classifier>exec</classifier>
+                </configuration>
+            </plugin>
+
+            <!--
+                Produce a test jar (bank-batch-0.0.1-SNAPSHOT-tests.jar) so
+                verification-lab can reuse the batchtest Spring profile and
+                schema.sql from this module's test classpath.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>test-jar</id>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

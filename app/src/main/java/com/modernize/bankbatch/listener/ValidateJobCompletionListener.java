@@ -21,9 +21,12 @@ public class ValidateJobCompletionListener implements JobExecutionListener {
     public void afterJob(JobExecution jobExecution) {
         if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
 
+            // Reuse the pipeline-wide run.id so the completion update only counts
+            // batches touched by this end-to-end execution, not historical rows.
             Timestamp runSince = new Timestamp(jobExecution.getJobParameters().getLong("run.id"));
 
-            // Count validated + rejected records for the current run only
+            // Count after all worker partitions finish so the job row captures the
+            // final combined outcome of accepted and rejected validation records.
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM bank.staged_transactions st " +
                 "JOIN bank.transaction_batches tb ON tb.id = st.batch_id " +
