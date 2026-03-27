@@ -1,0 +1,16 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/modernize_buildtest
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  main:
+    web-application-type: none
+
+batch-pipeline:
+  schedule: "-"

@@ -18,6 +18,12 @@ import java.util.List;
 import java.util.Map;
 
 @Configuration
+/**
+ * Configures reconciliation for the batches loaded in the current pipeline run.
+ *
+ * This job always writes reconciliation rows first; the pipeline service decides
+ * afterward whether any mismatches should fail the overall run.
+ */
 public class ReconcileJobConfig {
 
     @Bean
@@ -26,6 +32,8 @@ public class ReconcileJobConfig {
             Long runId = ((Number) chunkContext.getStepContext()
                 .getJobParameters()
                 .get("run.id")).longValue();
+            // run.id is created once in the pipeline service and reused across
+            // jobs so reconciliation can scope itself to the current end-to-end run.
             Timestamp runSince = new Timestamp(runId);
 
             // Create the reconciliation job row
@@ -69,7 +77,8 @@ public class ReconcileJobConfig {
                 long postedCount = (Long) posted.get("cnt");
                 long postedTotal = (Long) posted.get("total");
 
-                // Record the reconciliation result
+                // Always persist the audit row, even for mismatches. The pipeline
+                // service checks these rows later and turns mismatches into a failure.
                 jdbcTemplate.update(
                     "INSERT INTO bank.batch_reconciliations " +
                     "(batch_job_id, batch_id, staged_count, posted_count, " +

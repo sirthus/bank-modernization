@@ -11,6 +11,10 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.List;
 
+/**
+ * Writes validated staged rows into production transactions and then advances
+ * the source staged rows to posted.
+ */
 public class PostingWriter implements ItemWriter<StagedTransaction> {
 
     private final JdbcTemplate jdbcTemplate;
@@ -23,7 +27,7 @@ public class PostingWriter implements ItemWriter<StagedTransaction> {
     public void write(Chunk<? extends StagedTransaction> items) {
         List<? extends StagedTransaction> list = items.getItems();
 
-        // Batch insert into production transactions table
+        // Mirror the staged rows into the production-facing transactions table first.
         jdbcTemplate.batchUpdate(
             "INSERT INTO bank.transactions " +
             "(account_id, merchant_id, direction, amount_cents, status, description, batch_id) " +
@@ -49,7 +53,8 @@ public class PostingWriter implements ItemWriter<StagedTransaction> {
                 }
             });
 
-        // Batch update staged records to posted
+        // After the production insert succeeds, advance the staged source rows
+        // so reconciliation can compare posted staged records to transactions.
         jdbcTemplate.batchUpdate(
             "UPDATE bank.staged_transactions SET status = 'posted' WHERE id = ?",
             new BatchPreparedStatementSetter() {

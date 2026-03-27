@@ -26,6 +26,12 @@ import javax.sql.DataSource;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
+/**
+ * Configures the load job that turns one inbound CSV into staged rows.
+ *
+ * The setup step creates the batch/job metadata first so downstream listeners
+ * and writers can tag every staged record with the batch created for this file.
+ */
 public class LoadTransactionsJobConfig {
 
     private final AtomicInteger batchId = new AtomicInteger();
@@ -36,16 +42,22 @@ public class LoadTransactionsJobConfig {
                                      @Value("#{jobParameters['fileName']}") String fileName) {
         return (contribution, chunkContext) -> {
 
+            // Create the operational job row up front so the load listener can
+            // mark the same row completed/failed after the chunk step finishes.
             Integer jobId = jdbcTemplate.queryForObject(
                 "INSERT INTO bank.batch_jobs (job_name, status) " +
                 "VALUES ('load_transactions', 'running') RETURNING id",
                 Integer.class);
 
+            // Each input file gets a transaction_batches row before any records
+            // are read so every staged row can be tied back to its source file.
             Integer id = jdbcTemplate.queryForObject(
                 "INSERT INTO bank.transaction_batches (batch_job_id, file_name, status) " +
                 "VALUES (?, ?, 'received') RETURNING id",
                 Integer.class, jobId, fileName);
 
+            // The chunk processor runs after this tasklet and needs the batch id
+            // for every item it stages, so we keep the current file's id here.
             batchId.set(id);
 
             // Store IDs in execution context so the listener can access them
@@ -75,6 +87,8 @@ public class LoadTransactionsJobConfig {
             @Value("#{jobParameters['fileName']}") String fileName) {
         return new FlatFileItemReaderBuilder<StagedTransaction>()
                 .name("csvReader")
+                // fileName is supplied per job run, so the same bean definition
+                // can load whichever inbound file the pipeline is currently processing.
                 .resource(new ClassPathResource(fileName))
                 .delimited()
                 .names("accountId", "merchantId", "direction", "amountCents", "txnDate")
@@ -105,6 +119,8 @@ public class LoadTransactionsJobConfig {
                 .<StagedTransaction, StagedTransaction>chunk(500, transactionManager)
                 .reader(csvReader)
                 .processor(item -> {
+                    // The setup tasklet created the batch row for this file; stamp
+                    // each CSV record with that id before writing to staged storage.
                     item.setBatchId(batchId.get());
                     return item;
                 })

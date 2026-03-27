@@ -40,6 +40,12 @@ Errors accumulate per record — a record that fails Rules 1 and 2 gets both mes
 | `@Scheduled` cron | `dev`, `test`, `prod` | Nightly at 2:00 AM (configurable) |
 | REST endpoint | `dev`, `test`, `prod` | `POST /api/batch/run` with concurrency guard |
 
+## Verification Lab
+
+A companion Maven module that proves the modernized pipeline produces acceptable outputs by running golden datasets through the full pipeline, comparing actual database state against legacy-style baselines field-by-field, and producing HTML and JSON evidence reports. CI fails on unapproved divergence. Accepted differences require a signed, checked-in reviewer entry — not a suppression flag.
+
+Three datasets cover normalization noise (PASS), monetary precision drift (FAIL), and behavioral divergence on record disposition (FAIL). See [`verification-lab/README.md`](verification-lab/README.md) to run it, read reports, and understand the approval workflow. See [`docs/verification-case-study.md`](docs/verification-case-study.md) for the engineering rationale.
+
 ## Testing
 
 **25+ tests across 6 test classes**, using Spring Batch Test, Testcontainers (real PostgreSQL), and AssertJ:
@@ -101,6 +107,13 @@ app/
     application*.yml   Profile-specific configuration
     *.csv              Test and production ACH files
 
+verification-lab/
+  datasets/         Three golden datasets (DS-001, DS-002, DS-003) with scenario READMEs
+  expected-output/  Legacy-style baseline JSON files, one per dataset
+  approved-differences/  Signed reviewer sign-off files (YAML)
+  src/              Comparison engine, collector, report generators, integration tests
+  reports/          Runtime output — git-ignored; uploaded as CI artifact
+
 sql/                Schema and seed scripts (001–014)
 scripts/            PowerShell environment management
 docs/               Architecture and environment documentation
@@ -116,16 +129,21 @@ docker compose up -d
 .\scripts\setup-environments.ps1
 
 # Run in sandbox mode (processes files and exits)
-cd app && mvn spring-boot:run
+./app/mvnw -f app/pom.xml spring-boot:run
 
 # Run tests
-cd app && mvn test
+./app/mvnw -f app/pom.xml test
 
 # Run against dev database
-cd app && mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
+./app/mvnw -f app/pom.xml spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
+
+The repo includes a Maven wrapper (`app/mvnw`) — no separate Maven installation required.
 
 ## Documentation
 
 - [`docs/batch-pipeline.md`](docs/batch-pipeline.md) — full pipeline architecture, job details, error handling, observability
 - [`docs/environments.md`](docs/environments.md) — environment matrix, promotion flow, SQL build order
+- [`verification-lab/README.md`](verification-lab/README.md) — how to run the verification lab, report format, CI integration
+- [`docs/verification-lab-overview.md`](docs/verification-lab-overview.md) — verification design: classification model, normalization rules, approval policy, baseline format
+- [`docs/verification-case-study.md`](docs/verification-case-study.md) — engineering narrative: why the lab exists, design decisions, what each dataset demonstrates

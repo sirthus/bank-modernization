@@ -30,6 +30,12 @@ import javax.sql.DataSource;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @Configuration
+/**
+ * Configures the validation job that partitions staged work by batch_id.
+ *
+ * Validation is intentionally fault-tolerant: bad records are rejected and
+ * logged, while the rest of the batch continues toward posting.
+ */
 public class ValidateTransactionsJobConfig {
 
     private final AtomicInteger validateJobId = new AtomicInteger();
@@ -39,12 +45,16 @@ public class ValidateTransactionsJobConfig {
                                         ValidationSkipListener skipListener) {
         return (contribution, chunkContext) -> {
 
+            // Persist the job row before worker partitions start so every skip
+            // can log against the same validate_transactions execution record.
             Integer jobId = jdbcTemplate.queryForObject(
                 "INSERT INTO bank.batch_jobs (job_name, status) " +
                 "VALUES ('validate_transactions', 'running') RETURNING id",
                 Integer.class);
 
             validateJobId.set(jobId);
+            // The skip listener runs inside worker chunks, so share the current
+            // validation job id with it before any partition starts processing.
             skipListener.setValidateJobId(validateJobId);
 
             return RepeatStatus.FINISHED;
@@ -73,6 +83,8 @@ public class ValidateTransactionsJobConfig {
         return new JdbcCursorItemReaderBuilder<StagedTransaction>()
                 .name("partitionedStagedReader")
                 .dataSource(dataSource)
+                // Step-scoped reader + batchId from the partition execution
+                // context ensures each worker only sees one logical batch.
                 .sql("SELECT st.id, st.account_id, st.merchant_id, st.direction, " +
                      "       st.amount_cents, st.txn_date, st.status, " +
                      "       a.status AS account_status " +
@@ -115,6 +127,8 @@ public class ValidateTransactionsJobConfig {
                 .processor(validationProcessor)
                 .writer(validationWriter)
                 .faultTolerant()
+                // Validation failures are business rejections, not step failures.
+                // SkipListener owns writing rejected/error state for those records.
                 .skip(ValidationException.class)
                 .skipLimit(10000)
                 .listener(skipListener)
@@ -128,6 +142,8 @@ public class ValidateTransactionsJobConfig {
                              Partitioner validatePartitioner) {
 
         SimpleAsyncTaskExecutor taskExecutor = new SimpleAsyncTaskExecutor("validate-");
+        // Keep partition parallelism modest so validation fans out by batch
+        // without overwhelming the shared database in dev/test environments.
         taskExecutor.setConcurrencyLimit(4);
 
         return new StepBuilder("validateStep", jobRepository)

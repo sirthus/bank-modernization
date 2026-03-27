@@ -21,8 +21,12 @@ public class PostJobCompletionListener implements JobExecutionListener {
     public void afterJob(JobExecution jobExecution) {
         if (jobExecution.getStatus() == BatchStatus.COMPLETED) {
 
+            // Reuse the pipeline-wide run.id so the completion update only counts
+            // rows posted by the current pipeline execution.
             Timestamp runSince = new Timestamp(jobExecution.getJobParameters().getLong("run.id"));
 
+            // Count after all partitions finish so record_count reflects the final
+            // posted total once transaction inserts and staged status updates settle.
             Integer count = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM bank.staged_transactions st " +
                 "JOIN bank.transaction_batches tb ON tb.id = st.batch_id " +

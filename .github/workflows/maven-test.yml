@@ -59,4 +59,76 @@ jobs:
         run: chmod +x ./app/mvnw
 
       - name: Run tests
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/modernize_buildtest
         run: ./app/mvnw -f app/pom.xml test
+
+  verification-lab:
+    needs: test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: modernize_buildtest
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build schema
+        env:
+          PGPASSWORD: postgres
+        run: |
+          for f in \
+            sql/001_create_schema.sql \
+            sql/002_create_customers.sql \
+            sql/003_create_accounts.sql \
+            sql/004_create_merchants.sql \
+            sql/005_create_transactions.sql \
+            sql/006_create_indexes.sql \
+            sql/007_create_batch_jobs.sql \
+            sql/008_create_transaction_batches.sql \
+            sql/009_create_batch_job_errors.sql \
+            sql/010_create_staged_transactions.sql \
+            sql/011_create_batch_reconciliations.sql \
+            sql/013_drop_staged_account_fk.sql \
+            sql/014_add_batch_id_to_transactions.sql \
+            sql/012b_seed_small_data.sql; do
+            psql -h localhost -U postgres -d modernize_buildtest -f "$f"
+          done
+
+      - name: Make mvnw executable
+        run: chmod +x ./app/mvnw
+
+      - name: Install app module
+        run: ./app/mvnw -f app/pom.xml install -DskipTests
+
+      - name: Run Verification Lab
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/modernize_buildtest
+        run: ./app/mvnw -f verification-lab/pom.xml test
+
+      - name: Upload evidence reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: verification-lab-reports-${{ github.sha }}
+          path: verification-lab/reports/
+          retention-days: 90

@@ -76,12 +76,14 @@ with the web server disabled (`web-application-type: none`) and
 `spring.batch.job.enabled=false` so no job runs automatically on
 context startup.
 
-Run the application against a specific profile with:
+Run the application against a specific profile with (from the repo root):
 
-    mvn spring-boot:run "-Dspring-boot.run.profiles=sandbox"
-    mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
-    mvn spring-boot:run "-Dspring-boot.run.profiles=test"
-    mvn spring-boot:run "-Dspring-boot.run.profiles=prod"
+    ./app/mvnw -f app/pom.xml spring-boot:run "-Dspring-boot.run.profiles=sandbox"
+    ./app/mvnw -f app/pom.xml spring-boot:run "-Dspring-boot.run.profiles=dev"
+    ./app/mvnw -f app/pom.xml spring-boot:run "-Dspring-boot.run.profiles=test"
+    ./app/mvnw -f app/pom.xml spring-boot:run "-Dspring-boot.run.profiles=prod"
+
+The repo includes a Maven wrapper (`app/mvnw`) — no separate Maven installation required.
 
 ## Scripts
 
@@ -137,8 +139,9 @@ These files are applied in sequence by the environment build scripts:
     009_create_batch_job_errors.sql
     010_create_staged_transactions.sql
     011_create_batch_reconciliations.sql
-    012_seed_data.sql
+    012_seed_data.sql          ← variant applied here (see table below)
     013_drop_staged_account_fk.sql
+    014_add_batch_id_to_transactions.sql
 
 Seed data variants:
 
@@ -155,6 +158,10 @@ The routing is handled by `scripts/build-schema.ps1`.
 layer, so records with unknown account IDs must be able to load successfully and
 be caught later by Rule 3 of the validate job. Without this, those failure cases
 would be impossible to load and test.
+
+`014_add_batch_id_to_transactions.sql` adds a `batch_id` column to the
+`transactions` table so posted records can be traced back to the originating
+batch. Applied after seeding so it does not interfere with seed data constraints.
 
 ## Docker Compose
 

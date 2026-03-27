@@ -1,0 +1,20 @@
+{
+  "datasetId": "ds-002",
+  "description": "Four records. Legacy system truncated intermediate calculations; per-record amounts are understated by 1-2 cents. No approval entry exists. Expected result: Fail.",
+  "stagedCount": 4,
+  "postedCount": 4,
+  "rejectedCount": 0,
+  "errorCount": 0,
+  "totalPostedCents": 67777,
+  "reconciliation": {
+    "countsMatch": true,
+    "totalsMatch": true
+  },
+  "transactions": [
+    { "accountId": 2001, "merchantId": 3001, "direction": "D", "amountCents": 10000, "description": "Batch posted" },
+    { "accountId": 2001, "merchantId": 3001, "direction": "D", "amountCents": 7777,  "description": "Batch posted" },
+    { "accountId": 2002, "merchantId": 3002, "direction": "C", "amountCents": 20000, "description": "Batch posted" },
+    { "accountId": 2003, "merchantId": null, "direction": "C", "amountCents": 30000, "description": "Batch posted" }
+  ],
+  "errors": []
+}

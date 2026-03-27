@@ -1,0 +1,4 @@
+# Reports are generated at runtime and not checked into source control.
+# They are published as CI artifacts keyed to commit SHA.
+*
+!.gitignore
