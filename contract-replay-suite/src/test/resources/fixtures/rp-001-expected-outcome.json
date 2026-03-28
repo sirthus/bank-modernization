@@ -1,0 +1,22 @@
+{
+  "scenarioId": "RP-001",
+  "description": "Baseline happy path — 3 valid records, all posted, reconciliation passes",
+  "purpose": "Control case: proves the replay harness, Testcontainers setup, DB queries, and reporting all work end to end. If this fails, the environment is broken, not the scenarios.",
+  "fixtureFile": "fixtures/rp-001-baseline.csv",
+  "runsSubmitted": 1,
+  "expectedStagedCount": 3,
+  "expectedPostedCount": 3,
+  "expectedRejectedCount": 0,
+  "expectedErrorCount": 0,
+  "expectedTotalPostedCents": 31500,
+  "expectedReconciliation": {
+    "rowCount": 1,
+    "countsMatch": true,
+    "totalsMatch": true,
+    "stagedCount": 3,
+    "postedCount": 3,
+    "stagedTotalCents": 31500,
+    "postedTotalCents": 31500
+  },
+  "whatWouldBreakThis": "Any harness breakage, fixture drift, database setup issue, or posting/reconciliation regression would cause the baseline control case to fail."
+}

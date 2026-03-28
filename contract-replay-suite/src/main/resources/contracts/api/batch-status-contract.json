@@ -1,0 +1,24 @@
+{
+  "contractId": "API-BATCH-STATUS-001",
+  "endpoint": "GET /api/batch/status",
+  "description": "Pipeline status poll endpoint contract. Returns plain-text responses — not JSON envelopes.",
+  "note": "Consumers (scripts, orchestrators) depend on the exact string values 'idle' and 'running'.",
+  "responses": [
+    {
+      "scenario": "pipeline_idle",
+      "description": "No pipeline run is in progress",
+      "expectedStatus": 200,
+      "expectedBodyExact": "idle",
+      "contentType": "text/plain",
+      "guardsAgainst": "Changing the idle response string away from the exact token depended on by pollers and shell scripts."
+    },
+    {
+      "scenario": "pipeline_running",
+      "description": "Pipeline run is currently in progress (AtomicBoolean guard is true)",
+      "expectedStatus": 200,
+      "expectedBodyExact": "running",
+      "contentType": "text/plain",
+      "guardsAgainst": "Changing the running response string away from the exact token depended on by pollers and shell scripts."
+    }
+  ]
+}
