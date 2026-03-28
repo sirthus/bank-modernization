@@ -107,6 +107,30 @@ CSV files are loaded from the classpath (`src/main/resources/`). The list of fil
 
 Profile-specific JDBC config lives in `app/src/main/resources/application-{profile}.yml`.
 
+## Contract-Replay-Suite
+
+A standalone Maven module (`contract-replay-suite/`) that validates the batch pipeline against machine-readable contracts and executes operational regression scenarios. It requires no manual database setup — Testcontainers starts a fresh PostgreSQL 15 container automatically.
+
+### Running locally
+
+```bash
+# Run all contract and replay tests (no Docker Compose needed)
+./app/mvnw -f contract-replay-suite/pom.xml test
+```
+
+The suite uses the `contracttest` Spring profile, which configures a Testcontainers JDBC URL. Reports are written to `contract-replay-suite/reports/` (git-ignored). CI uploads them as artifacts on every PR run.
+
+### What the suite covers
+
+| Layer | What it checks |
+| ----- | -------------- |
+| File contracts | ACH CSV column presence, types, and drift classification |
+| API contracts | `/api/batch/run` and `/api/batch/status` response shape and status codes |
+| Output invariants | Six reconciliation invariants (counts, totals, rejected exclusion) |
+| Replay scenarios | Three end-to-end regression scenarios (RP-001 baseline, RP-002 run isolation, RP-003 validation skip) |
+
+Contract definitions live in `contract-replay-suite/src/main/resources/contracts/`. Replay fixture expectations live in `contract-replay-suite/src/test/resources/fixtures/`. Sample evidence reports are checked in under `contract-replay-suite/docs/examples/`.
+
 ## Workflow rules
 
 Claude must follow this repository workflow exactly:

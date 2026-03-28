@@ -1,0 +1,65 @@
+{
+  "contractId": "ACH-FILE-001",
+  "description": "ACH inbound transaction file format contract",
+  "version": "1.0",
+  "format": "CSV",
+  "delimiter": ",",
+  "headerRequired": true,
+  "columns": [
+    {
+      "name": "account_id",
+      "position": 0,
+      "type": "INTEGER",
+      "nullable": false,
+      "description": "Must reference a known account in bank.accounts"
+    },
+    {
+      "name": "merchant_id",
+      "position": 1,
+      "type": "INTEGER",
+      "nullable": true,
+      "description": "Optional — null accepted for merchant-free transactions"
+    },
+    {
+      "name": "direction",
+      "position": 2,
+      "type": "STRING",
+      "nullable": false,
+      "allowedValues": ["D", "C"],
+      "description": "Debit or Credit — case-sensitive, exactly one character, lowercase rejected by validation"
+    },
+    {
+      "name": "amount_cents",
+      "position": 3,
+      "type": "INTEGER",
+      "nullable": false,
+      "constraints": { "minimum": 1 },
+      "description": "Whole cents — must be a positive integer, zero and negatives rejected by validation"
+    },
+    {
+      "name": "txn_date",
+      "position": 4,
+      "type": "DATE",
+      "nullable": false,
+      "format": "YYYY-MM-DD",
+      "description": "ISO 8601 date — no time component, US formats rejected"
+    }
+  ],
+  "driftClassification": {
+    "BREAKING": [
+      "missing required column",
+      "wrong delimiter",
+      "header row absent",
+      "required column renamed",
+      "column count less than expected"
+    ],
+    "WARNING": [
+      "extra column appended beyond expected columns",
+      "column order changed"
+    ],
+    "COMPATIBLE": [
+      "trailing whitespace in values",
+      "extra blank lines at end of file"
+    ]
+  }
+}

@@ -1,0 +1,220 @@
+{
+  "suiteId" : "contract-replay-suite",
+  "timestamp" : "2026-03-27T00:00:00",
+  "environment" : "contracttest",
+  "overallStatus" : "PASS",
+  "contractResults" : [ {
+    "contractId" : "ACH-FILE-001",
+    "boundaryName" : "Inbound File",
+    "overallStatus" : "PASS",
+    "checks" : [ {
+      "checkId" : "FILE-VALID-001",
+      "description" : "Canonical inbound fixture satisfies the ACH file contract",
+      "expectedOutcome" : "Validator returns PASS with no violations",
+      "actualOutcome" : "PASS with no violations",
+      "status" : "PASS"
+    }, {
+      "checkId" : "FILE-NEG-MISSING-COL",
+      "description" : "Missing required column is detected",
+      "expectedOutcome" : "Validator returns FAIL with ACH-FILE-001-COL-MISSING",
+      "actualOutcome" : "FAIL with violations: ACH-FILE-001-COL-MISSING",
+      "status" : "PASS"
+    }, {
+      "checkId" : "FILE-NEG-LATER-ROW-TYPE",
+      "description" : "Malformed later rows are validated, not just the first row",
+      "expectedOutcome" : "Validator returns FAIL with ACH-FILE-001-TYPE-MERCHANT mentioning row 3",
+      "actualOutcome" : "FAIL with violations: ACH-FILE-001-TYPE-MERCHANT",
+      "status" : "PASS"
+    }, {
+      "checkId" : "FILE-NEG-EXTRA-COL",
+      "description" : "Extra columns are surfaced as non-breaking drift",
+      "expectedOutcome" : "Validator returns WARNING with ACH-FILE-001-COL-EXTRA",
+      "actualOutcome" : "WARNING with violations: ACH-FILE-001-COL-EXTRA",
+      "status" : "PASS"
+    }, {
+      "checkId" : "FILE-NEG-COL-ORDER",
+      "description" : "Column-order drift is surfaced as a warning",
+      "expectedOutcome" : "Validator returns WARNING with ACH-FILE-001-COL-ORDER",
+      "actualOutcome" : "WARNING with violations: ACH-FILE-001-COL-ORDER",
+      "status" : "PASS"
+    } ],
+    "violations" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:01"
+  }, {
+    "contractId" : "API-BATCH-RUN-001",
+    "boundaryName" : "POST /api/batch/run",
+    "overallStatus" : "PASS",
+    "checks" : [ {
+      "checkId" : "API-RUN-CLEAN",
+      "description" : "Happy-path trigger response matches the contract",
+      "expectedOutcome" : "Scenario clean_trigger satisfies the API contract",
+      "actualOutcome" : "status=200, contentType=text/plain;charset=UTF-8, body=\"Pipeline completed successfully\"",
+      "status" : "PASS"
+    }, {
+      "checkId" : "API-RUN-CONCURRENT",
+      "description" : "Concurrent trigger conflict response matches the contract",
+      "expectedOutcome" : "Scenario concurrent_trigger satisfies the API contract",
+      "actualOutcome" : "status=409, contentType=text/plain;charset=UTF-8, body=\"Pipeline is already running\"",
+      "status" : "PASS"
+    }, {
+      "checkId" : "API-RUN-FAILURE",
+      "description" : "Pipeline failure response matches the contract",
+      "expectedOutcome" : "Scenario pipeline_failure satisfies the API contract",
+      "actualOutcome" : "status=500, contentType=text/plain;charset=UTF-8, body=\"Pipeline failed: forced suite failure\"",
+      "status" : "PASS"
+    } ],
+    "violations" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:02"
+  }, {
+    "contractId" : "API-BATCH-STATUS-001",
+    "boundaryName" : "GET /api/batch/status",
+    "overallStatus" : "PASS",
+    "checks" : [ {
+      "checkId" : "API-STATUS-IDLE",
+      "description" : "Idle poll response matches the contract",
+      "expectedOutcome" : "Scenario pipeline_idle satisfies the API contract",
+      "actualOutcome" : "status=200, contentType=text/plain;charset=UTF-8, body=\"idle\"",
+      "status" : "PASS"
+    }, {
+      "checkId" : "API-STATUS-RUNNING",
+      "description" : "Running poll response matches the contract",
+      "expectedOutcome" : "Scenario pipeline_running satisfies the API contract",
+      "actualOutcome" : "status=200, contentType=text/plain;charset=UTF-8, body=\"running\"",
+      "status" : "PASS"
+    } ],
+    "violations" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:03"
+  }, {
+    "contractId" : "OUTPUT-RECON-001",
+    "boundaryName" : "Output State — Reconciliation Invariants",
+    "overallStatus" : "PASS",
+    "checks" : [ {
+      "checkId" : "OUTPUT-CLEAN-PASS",
+      "description" : "Clean baseline run satisfies all scoped reconciliation invariants",
+      "expectedOutcome" : "Scoped invariant check returns PASS with no violations",
+      "actualOutcome" : "PASS with no violations",
+      "status" : "PASS"
+    }, {
+      "checkId" : "OUTPUT-REJECTED-EXCLUDED",
+      "description" : "Rejected rows are excluded from INV-003 count and total calculations",
+      "expectedOutcome" : "Scoped invariant check passes with no INV-003 violations",
+      "actualOutcome" : "PASS with no violations",
+      "status" : "PASS"
+    }, {
+      "checkId" : "OUTPUT-TAMPER-DETECTED",
+      "description" : "Tampered staged totals are detected as INV-003-TOTAL",
+      "expectedOutcome" : "Scoped invariant check fails with INV-003-TOTAL only",
+      "actualOutcome" : "FAIL with violations: INV-003-TOTAL",
+      "status" : "PASS"
+    }, {
+      "checkId" : "OUTPUT-SCOPED-CLEAN",
+      "description" : "Historical bad reconciliations do not poison a later scoped clean run",
+      "expectedOutcome" : "Scoped invariant check returns PASS for the later clean batch_ids",
+      "actualOutcome" : "PASS with no violations",
+      "status" : "PASS"
+    } ],
+    "violations" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:04"
+  } ],
+  "replayResults" : [ {
+    "scenarioId" : "RP-001",
+    "description" : "Baseline happy path — 3 valid records, all posted, reconciliation passes",
+    "purpose" : "Control case: proves the replay harness, Testcontainers setup, DB queries, and reporting all work end to end. If this fails, the environment is broken, not the scenarios.",
+    "whatWouldBreakThis" : "Any harness breakage, fixture drift, database setup issue, or posting/reconciliation regression would cause the baseline control case to fail.",
+    "status" : "PASS",
+    "expectedSummary" : "staged=3, posted=3, rejected=0, errors=0, total=31500, reconRows=1",
+    "actualSummary" : "staged=3, posted=3, rejected=0, errors=0, total=31500, reconRows=1, countsMatch=true, totalsMatch=true, perRunMatch=n/a",
+    "actualStagedCount" : 3,
+    "actualPostedCount" : 3,
+    "actualRejectedCount" : 0,
+    "actualErrorCount" : 0,
+    "actualTotalPostedCents" : 31500,
+    "reconciliationRowCount" : 1,
+    "reconciliationCountsMatch" : true,
+    "reconciliationTotalsMatch" : true,
+    "perRunExpectationsMatch" : null,
+    "reconciliationDetails" : [ {
+      "runNumber" : 1,
+      "batchId" : 101,
+      "stagedCount" : 3,
+      "postedCount" : 3,
+      "stagedTotalCents" : 31500,
+      "postedTotalCents" : 31500,
+      "countsMatch" : true,
+      "totalsMatch" : true,
+      "expectationMatch" : true
+    } ],
+    "mismatches" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:05"
+  }, {
+    "scenarioId" : "RP-002",
+    "description" : "Sequential run isolation — same fixture run twice, each run scoped by run.id timestamp",
+    "purpose" : "Proves the reconcile job's WHERE bj.started_at >= ? filter correctly isolates each run's reconciliation. If this filter is removed or broken, run 2 would aggregate both runs' batches and produce a staged_count of 6 instead of 3.",
+    "whatWouldBreakThis" : "Removing or broadening the started_at >= ? filter in ReconcileJobConfig would cause run 2 to include run 1's batches, inflating staged_count and posted_count to 6 in a single reconciliation row.",
+    "status" : "PASS",
+    "expectedSummary" : "staged=6, posted=6, rejected=0, errors=0, total=63000, per-run staged=3, per-run posted=3, per-run total=31500, aggregateReconRows=2",
+    "actualSummary" : "staged=6, posted=6, rejected=0, errors=0, total=63000, reconRows=2, countsMatch=true, totalsMatch=true, perRunMatch=true",
+    "actualStagedCount" : 6,
+    "actualPostedCount" : 6,
+    "actualRejectedCount" : 0,
+    "actualErrorCount" : 0,
+    "actualTotalPostedCents" : 63000,
+    "reconciliationRowCount" : 2,
+    "reconciliationCountsMatch" : true,
+    "reconciliationTotalsMatch" : true,
+    "perRunExpectationsMatch" : true,
+    "reconciliationDetails" : [ {
+      "runNumber" : 1,
+      "batchId" : 102,
+      "stagedCount" : 3,
+      "postedCount" : 3,
+      "stagedTotalCents" : 31500,
+      "postedTotalCents" : 31500,
+      "countsMatch" : true,
+      "totalsMatch" : true,
+      "expectationMatch" : true
+    }, {
+      "runNumber" : 2,
+      "batchId" : 103,
+      "stagedCount" : 3,
+      "postedCount" : 3,
+      "stagedTotalCents" : 31500,
+      "postedTotalCents" : 31500,
+      "countsMatch" : true,
+      "totalsMatch" : true,
+      "expectationMatch" : true
+    } ],
+    "mismatches" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:06"
+  }, {
+    "scenarioId" : "RP-003",
+    "description" : "Validation skip — bad row rejected, pipeline completes, reconciliation excludes rejected row",
+    "purpose" : "Proves that Spring Batch's skip policy tolerates ValidationException, that rejected rows are correctly tracked in batch_job_errors, and that reconciliation's WHERE status='posted' filter excludes rejected records from staged_count.",
+    "whatWouldBreakThis" : "Changing the skip-policy limit to 0, removing ValidationException from the skippable-exception list, or removing the status='posted' filter in ReconcileJobConfig would all cause this test to fail.",
+    "status" : "PASS",
+    "expectedSummary" : "staged=3, posted=2, rejected=1, errors=1, total=6500, reconRows=1",
+    "actualSummary" : "staged=3, posted=2, rejected=1, errors=1, total=6500, reconRows=1, countsMatch=true, totalsMatch=true, perRunMatch=n/a",
+    "actualStagedCount" : 3,
+    "actualPostedCount" : 2,
+    "actualRejectedCount" : 1,
+    "actualErrorCount" : 1,
+    "actualTotalPostedCents" : 6500,
+    "reconciliationRowCount" : 1,
+    "reconciliationCountsMatch" : true,
+    "reconciliationTotalsMatch" : true,
+    "perRunExpectationsMatch" : null,
+    "reconciliationDetails" : [ {
+      "runNumber" : 1,
+      "batchId" : 104,
+      "stagedCount" : 2,
+      "postedCount" : 2,
+      "stagedTotalCents" : 6500,
+      "postedTotalCents" : 6500,
+      "countsMatch" : true,
+      "totalsMatch" : true,
+      "expectationMatch" : true
+    } ],
+    "mismatches" : [ ],
+    "evaluatedAt" : "2026-03-27T00:00:07"
+  } ]
+}

@@ -1,0 +1,4 @@
+# Evidence reports are generated at runtime and not tracked in git.
+# Sample reports live in sample-reports/ and are tracked.
+*.json
+*.md

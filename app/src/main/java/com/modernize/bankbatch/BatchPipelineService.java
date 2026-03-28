@@ -119,14 +119,16 @@ public class BatchPipelineService {
                 "  AND (NOT br.counts_match OR NOT br.totals_match)",
                 Integer.class, new Timestamp(runTimestamp.getTime()));
 
+            // Always print the summary before checking reconciliation results so
+            // operators have a report artifact even when the pipeline halts on a mismatch.
+            MDC.remove("job.name");
+            summaryReport.print();
+
             if (reconFailures != null && reconFailures > 0) {
                 throw new RuntimeException(
                     "Pipeline halted: reconciliation failed for " + reconFailures +
                     " batch(es) — check bank.batch_reconciliations for details");
             }
-
-            MDC.remove("job.name");
-            summaryReport.print();
 
             log.info("Pipeline complete");
 

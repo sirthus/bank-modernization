@@ -1,0 +1,4 @@
+account_id,merchant_id,direction,amount_cents,txn_date
+2001,3001,D,5000,2025-03-10
+2002,3002,C,1500,2025-03-10
+2003,,C,25000,2025-03-10

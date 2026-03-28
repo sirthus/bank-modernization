@@ -48,6 +48,14 @@ A companion Maven module that proves the modernized pipeline produces acceptable
 
 Three datasets cover normalization noise (PASS), monetary precision drift (FAIL), and behavioral divergence on record disposition (FAIL). See [`verification-lab/README.md`](verification-lab/README.md) to run it, read reports, and understand the approval workflow. See [`docs/verification-case-study.md`](docs/verification-case-study.md) for the engineering rationale.
 
+## Contract and Replay Suite
+
+A companion Maven module that proves the batch pipeline's processing guarantees by validating against machine-readable contracts — file format, API boundaries, and reconciliation invariants — and executing operational regression scenarios. No manual database setup is needed; Testcontainers starts a fresh PostgreSQL container automatically.
+
+CI runs the suite on every PR and uploads JSON and Markdown evidence reports as artifacts. Checked-in sample reports and a guardrail matrix live in `contract-replay-suite/docs/examples/`.
+
+See [`contract-replay-suite/README.md`](contract-replay-suite/README.md) to run the suite, read the evidence reports, and understand the contract-testing philosophy.
+
 ## Testing
 
 **25+ tests across 6 test classes**, using Spring Batch Test, Testcontainers (real PostgreSQL), and AssertJ:
@@ -116,6 +124,13 @@ verification-lab/
   src/              Comparison engine, collector, report generators, integration tests
   reports/          Runtime output — git-ignored; uploaded as CI artifact
 
+contract-replay-suite/
+  src/main/resources/contracts/   JSON contract definitions (file, API, output invariants)
+  src/test/java/                  Contract validators, replay tests, report generators
+  src/test/resources/fixtures/    Replay scenario expectation files
+  docs/examples/                  Checked-in sample evidence reports and guardrail matrix
+  reports/                        Runtime output — git-ignored; uploaded as CI artifact
+
 sql/                Schema and seed scripts (001–014)
 scripts/            PowerShell environment management
 docs/               Architecture and environment documentation
@@ -133,7 +148,7 @@ docker compose up -d
 # Run in sandbox mode (processes files and exits)
 ./app/mvnw -f app/pom.xml spring-boot:run
 
-# Run tests
+# Run app tests
 ./app/mvnw -f app/pom.xml test
 
 # Run against dev database
@@ -141,6 +156,26 @@ docker compose up -d
 ```
 
 The repo includes a Maven wrapper (`app/mvnw`) — no separate Maven installation required.
+
+### Running the companion modules
+
+The verification lab and contract-replay suite are standalone Maven modules with their own test suites.
+
+```bash
+# --- Verification Lab ---
+# Requires PostgreSQL running and databases created (see above)
+# Install the app module first (produces the thin jar the lab depends on)
+./app/mvnw -f app/pom.xml install -DskipTests
+
+# Run all three verification datasets
+./app/mvnw -f verification-lab/pom.xml test
+
+# --- Contract and Replay Suite ---
+# No PostgreSQL setup needed — Testcontainers starts its own container
+./app/mvnw -f contract-replay-suite/pom.xml test
+```
+
+Reports for both modules are written to their respective `reports/` directories (git-ignored) and uploaded as CI artifacts on every PR run.
 
 ## Documentation
 
@@ -150,3 +185,5 @@ The repo includes a Maven wrapper (`app/mvnw`) — no separate Maven installatio
 - [`docs/verification-lab-overview.md`](docs/verification-lab-overview.md) — verification design: classification model, normalization rules, approval policy, baseline format
 - [`docs/verification-case-study.md`](docs/verification-case-study.md) — engineering narrative: why the lab exists, design decisions, what each dataset demonstrates
 - [`verification-lab/sample-reports/`](verification-lab/sample-reports/) — representative HTML and JSON evidence reports from a DS-002 run
+- [`contract-replay-suite/README.md`](contract-replay-suite/README.md) — how to run the contract and replay suite, report format, CI integration
+- [`contract-replay-suite/docs/examples/`](contract-replay-suite/docs/examples/) — checked-in sample evidence reports and guardrail matrix

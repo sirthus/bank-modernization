@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5433/modernize_buildtest
-    username: postgres
-    password: postgres
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/modernize_buildtest
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
   main:
     web-application-type: none
 
