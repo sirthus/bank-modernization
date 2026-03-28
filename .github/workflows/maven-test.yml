@@ -132,3 +132,35 @@ jobs:
           name: verification-lab-reports-${{ github.sha }}
           path: verification-lab/reports/
           retention-days: 90
+
+  contract-replay:
+    needs: test
+    runs-on: ubuntu-latest
+    # No services block — Testcontainers starts its own PostgreSQL container.
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Make mvnw executable
+        run: chmod +x ./app/mvnw
+
+      - name: Install app module
+        run: ./app/mvnw -f app/pom.xml install -DskipTests
+
+      - name: Run Contract + Replay Suite
+        run: ./app/mvnw -f contract-replay-suite/pom.xml test
+
+      - name: Upload contract-replay reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contract-replay-reports-${{ github.sha }}
+          path: contract-replay-suite/reports/
+          retention-days: 90

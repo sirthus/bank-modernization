@@ -1,0 +1,43 @@
+{
+  "contractId": "OUTPUT-RECON-001",
+  "description": "Post-run reconciliation table invariants. These must hold in bank.batch_reconciliations after every successful pipeline run.",
+  "note": "The reconcile job counts staged_transactions WHERE status='posted' — rejected records are structurally excluded from all counts and totals.",
+  "invariants": [
+    {
+      "id": "INV-001",
+      "description": "counts_match must be true after a clean run with no rejected records",
+      "severity": "FAIL",
+      "guardsAgainst": "A reconciliation regression that leaves counts_match=false after a clean run."
+    },
+    {
+      "id": "INV-002",
+      "description": "totals_match must be true after a clean run with no rejected records",
+      "severity": "FAIL",
+      "guardsAgainst": "A reconciliation regression that leaves totals_match=false after a clean run."
+    },
+    {
+      "id": "INV-003",
+      "description": "Rejected records must be excluded from staged_count and staged_total_cents",
+      "severity": "FAIL",
+      "guardsAgainst": "Rejected rows leaking into staged_count or staged_total_cents."
+    },
+    {
+      "id": "INV-004",
+      "description": "Each batch_id must have exactly one reconciliation row — no duplicates on retry",
+      "severity": "FAIL",
+      "guardsAgainst": "Duplicate reconciliation rows for the same batch after retry or rerun."
+    },
+    {
+      "id": "INV-005",
+      "description": "staged_count and posted_count must both be >= 0",
+      "severity": "FAIL",
+      "guardsAgainst": "Negative reconciliation counts caused by aggregation or data-corruption bugs."
+    },
+    {
+      "id": "INV-006",
+      "description": "posted_count must never exceed staged_count — cannot post more than were staged as posted",
+      "severity": "FAIL",
+      "guardsAgainst": "posted_count exceeding staged_count because reconciliation over-reported posted transactions."
+    }
+  ]
+}

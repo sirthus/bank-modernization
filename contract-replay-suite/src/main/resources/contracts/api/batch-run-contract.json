@@ -1,0 +1,32 @@
+{
+  "contractId": "API-BATCH-RUN-001",
+  "endpoint": "POST /api/batch/run",
+  "description": "Pipeline trigger endpoint contract. Returns plain-text responses — not JSON envelopes.",
+  "note": "BatchController is @Profile(!sandbox). The contracttest profile satisfies this condition.",
+  "responses": [
+    {
+      "scenario": "clean_trigger",
+      "description": "Pipeline triggered with no concurrent run in progress",
+      "expectedStatus": 200,
+      "expectedBodyExact": "Pipeline completed successfully",
+      "contentType": "text/plain",
+      "guardsAgainst": "Changing the success response body or returning a JSON envelope instead of plain text, breaking scripts that depend on the exact completion message."
+    },
+    {
+      "scenario": "concurrent_trigger",
+      "description": "POST fired while pipeline is already running (AtomicBoolean guard active)",
+      "expectedStatus": 409,
+      "expectedBodyContains": "already running",
+      "contentType": "text/plain",
+      "guardsAgainst": "Dropping the 409 conflict semantics for concurrent runs, hiding orchestration collisions from callers."
+    },
+    {
+      "scenario": "pipeline_failure",
+      "description": "Pipeline throws a runtime exception (e.g. reconciliation mismatch)",
+      "expectedStatus": 500,
+      "expectedBodyStartsWith": "Pipeline failed:",
+      "contentType": "text/plain",
+      "guardsAgainst": "Masking runtime failures behind a success-looking response or a differently shaped error body."
+    }
+  ]
+}

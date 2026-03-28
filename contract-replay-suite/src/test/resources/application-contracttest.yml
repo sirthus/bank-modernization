@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    # Testcontainers JDBC URL: starts a fresh PostgreSQL 15 container automatically.
+    # TC_INITSCRIPT runs schema.sql from the bank-batch test jar (classpath root)
+    # to create all bank.* tables before Spring wires up.
+    url: jdbc:tc:postgresql:15:///modernize_contracttest?TC_INITSCRIPT=schema.sql
+    username: postgres
+    password: postgres
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  batch:
+    jdbc:
+      initialize-schema: always
+    job:
+      enabled: false
+  main:
+    # Keep the servlet context alive so BatchController is loaded.
+    # Required for ApiContractTest (RANDOM_PORT). Batch-only tests override
+    # to NONE via @SpringBootTest(webEnvironment = NONE).
+    web-application-type: servlet
+
+batch-pipeline:
+  files:
+    - fixtures/rp-001-baseline.csv
+  schedule: "-"

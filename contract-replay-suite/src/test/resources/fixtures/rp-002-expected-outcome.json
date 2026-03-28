@@ -1,0 +1,28 @@
+{
+  "scenarioId": "RP-002",
+  "description": "Sequential run isolation — same fixture run twice, each run scoped by run.id timestamp",
+  "purpose": "Proves the reconcile job's WHERE bj.started_at >= ? filter correctly isolates each run's reconciliation. If this filter is removed or broken, run 2 would aggregate both runs' batches and produce a staged_count of 6 instead of 3.",
+  "fixtureFile": "fixtures/rp-001-baseline.csv",
+  "runsSubmitted": 2,
+  "expectedStagedCount": 6,
+  "expectedPostedCount": 6,
+  "expectedRejectedCount": 0,
+  "expectedErrorCount": 0,
+  "expectedTotalPostedCents": 63000,
+  "expectedPerRun": {
+    "stagedCount": 3,
+    "postedCount": 3,
+    "stagedTotalCents": 31500,
+    "postedTotalCents": 31500,
+    "countsMatch": true,
+    "totalsMatch": true
+  },
+  "expectedAfterBothRuns": {
+    "totalStagedTransactions": 6,
+    "totalPostedTransactions": 6,
+    "reconciliationRowCount": 2,
+    "eachRowCountsMatch": true,
+    "eachRowTotalsMatch": true
+  },
+  "whatWouldBreakThis": "Removing or broadening the started_at >= ? filter in ReconcileJobConfig would cause run 2 to include run 1's batches, inflating staged_count and posted_count to 6 in a single reconciliation row."
+}

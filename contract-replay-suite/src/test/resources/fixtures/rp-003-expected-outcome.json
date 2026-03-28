@@ -1,0 +1,26 @@
+{
+  "scenarioId": "RP-003",
+  "description": "Validation skip — bad row rejected, pipeline completes, reconciliation excludes rejected row",
+  "purpose": "Proves that Spring Batch's skip policy tolerates ValidationException, that rejected rows are correctly tracked in batch_job_errors, and that reconciliation's WHERE status='posted' filter excludes rejected records from staged_count.",
+  "fixtureFile": "fixtures/rp-003-validation-skip.csv",
+  "runsSubmitted": 1,
+  "fixtureContents": [
+    { "account_id": 2001, "merchant_id": 3001, "direction": "D", "amount_cents": 5000, "txn_date": "2025-03-10", "valid": true },
+    { "account_id": 2002, "merchant_id": 3002, "direction": "D", "amount_cents": 0,    "txn_date": "2025-03-10", "valid": false, "rule": "Rule 1: amount must be positive" },
+    { "account_id": 2003, "merchant_id": null, "direction": "C", "amount_cents": 1500, "txn_date": "2025-03-10", "valid": true }
+  ],
+  "expectedStagedCount": 3,
+  "expectedPostedCount": 2,
+  "expectedRejectedCount": 1,
+  "expectedErrorCount": 1,
+  "expectedTotalPostedCents": 6500,
+  "expectedReconciliation": {
+    "rowCount": 1,
+    "stagedCount": 2,
+    "postedCount": 2,
+    "countsMatch": true,
+    "totalsMatch": true,
+    "note": "stagedCount=2 because ReconcileJobConfig queries WHERE status='posted', excluding the rejected row"
+  },
+  "whatWouldBreakThis": "Changing the skip-policy limit to 0, removing ValidationException from the skippable-exception list, or removing the status='posted' filter in ReconcileJobConfig would all cause this test to fail."
+}
